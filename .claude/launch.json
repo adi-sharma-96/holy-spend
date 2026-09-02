@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "widget-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "widget"],
+      "port": 5173
+    },
+    {
+      "name": "site-preview",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8735", "--directory", "docs/site"],
+      "port": 8735
+    }
+  ]
+}

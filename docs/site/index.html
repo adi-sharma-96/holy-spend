@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holy Spend</title>
+<meta name="description" content="A private expense and nutrition tracker that lives inside the chat you already have open.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,440;9..144,560;9..144,650&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f0d;
+    --bg-raised: #101613;
+    --bg-line: #0d1311;
+    --ink: #edf2ee;
+    --ink-dim: #a6b3ac;
+    --ink-faint: #64716a;
+    --emerald: #2ea043;
+    --emerald-bright: #4fd371;
+    --emerald-dim: #1e6b30;
+    --rule: #223129;
+    --rule-strong: #33453b;
+    --receipt: #f2f1ea;
+    --receipt-ink: #171a15;
+    --focus: #6fe497;
+
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(46,160,67,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 20%, rgba(46,160,67,0.06), transparent 55%);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  ::selection { background: var(--emerald-dim); color: #fff; }
+
+  a { color: var(--emerald-bright); }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  img { max-width: 100%; display: block; }
+
+  .wrap {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 560; margin: 0; text-wrap: balance; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--emerald-bright);
+  }
+
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* ---------- perforated divider, the one recurring motif ---------- */
+  .perf {
+    height: 1px;
+    background-image: repeating-linear-gradient(90deg, var(--rule) 0 6px, transparent 6px 13px);
+    margin: 0;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 0;
+  }
+  .topbar .mark {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    color: var(--ink-dim);
+  }
+  .topbar .mark strong { color: var(--ink); font-weight: 600; }
+  .topbar nav a {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink-dim);
+    text-decoration: none;
+    margin-left: 22px;
+  }
+  .topbar nav a:hover { color: var(--emerald-bright); }
+
+  /* ---------- hero ---------- */
+  .hero {
+    padding: 48px 0 40px;
+    display: grid;
+    grid-template-columns: 1.15fr 0.75fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .hero h1 {
+    font-size: clamp(38px, 5vw, 58px);
+    line-height: 1.06;
+    color: var(--ink);
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: var(--emerald-bright);
+  }
+  .hero .lede {
+    margin-top: 22px;
+    font-size: 18px;
+    line-height: 1.65;
+    color: var(--ink-dim);
+    max-width: 46ch;
+  }
+  .hero .cta-row {
+    margin-top: 32px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    padding: 12px 20px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--emerald); color: #04140a; font-weight: 600; }
+  .btn-primary:hover { background: var(--emerald-bright); }
+  .btn-ghost { border-color: var(--rule-strong); color: var(--ink); }
+  .btn-ghost:hover { border-color: var(--emerald-bright); color: var(--emerald-bright); }
+
+  .hero-frame {
+    position: relative;
+    justify-self: center;
+  }
+  .hero-frame .shot-frame {
+    width: 240px;
+    aspect-ratio: 9 / 16;
+    border-radius: 20px;
+    box-shadow: 0 30px 70px -20px rgba(0,0,0,0.7), 0 0 0 1px var(--rule-strong);
+  }
+  .hero-frame::before {
+    content: "";
+    position: absolute;
+    inset: -30px -50px auto auto;
+    top: -34px;
+    right: -46px;
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle, rgba(46,160,67,0.28), transparent 70%);
+    filter: blur(6px);
+    z-index: -1;
+  }
+
+  /* ---------- shot frame: crops tall phone screenshots to a sane box ---------- */
+  .shot-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: 18px;
+    background: var(--bg-raised);
+  }
+  .shot-frame img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+  }
+
+  /* ---------- section shell ---------- */
+  section { padding: 40px 0; }
+  .section-head { max-width: 60ch; margin-bottom: 28px; }
+  .section-head h2 {
+    font-size: clamp(26px, 3vw, 34px);
+    margin-top: 10px;
+    color: var(--ink);
+  }
+  .section-head p { color: var(--ink-dim); margin-top: 12px; font-size: 16px; }
+
+  /* ---------- receipt line-item features ---------- */
+  .line-item {
+    display: grid;
+    grid-template-columns: minmax(0, 440px) 300px;
+    justify-content: space-between;
+    gap: 40px;
+    align-items: center;
+    padding: 32px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .section-head + .line-item { border-top: none; }
+  .cluster-break + .line-item { border-top: none; }
+
+  .cluster-break {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 10px 0 -8px;
+  }
+  .cluster-break::before, .cluster-break::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-image: repeating-linear-gradient(90deg, var(--rule) 0 6px, transparent 6px 13px);
+  }
+  .cluster-break span {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .line-item.reverse { grid-template-columns: 300px minmax(0, 440px); }
+  .line-item.reverse .li-shot { order: 1; }
+  .line-item.reverse .li-copy { order: 2; }
+
+  .li-copy .eyebrow { display: block; margin-bottom: 8px; }
+  .li-copy h3 { font-size: 23px; line-height: 1.25; color: var(--ink); }
+  .li-copy p { margin-top: 10px; color: var(--ink-dim); font-size: 15px; max-width: 42ch; }
+  .li-copy .stat {
+    display: inline-block;
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--emerald-bright);
+    background: rgba(46,160,67,0.10);
+    border: 1px solid var(--emerald-dim);
+    padding: 5px 11px;
+    border-radius: 3px;
+  }
+
+  .li-shot { justify-self: center; width: 100%; }
+  .li-shot .shot-frame {
+    width: 100%;
+    max-width: 300px;
+    aspect-ratio: 9 / 16;
+    box-shadow: 0 20px 40px -16px rgba(0,0,0,0.6), 0 0 0 1px var(--rule-strong);
+  }
+
+  /* ---------- "how it works" strip ---------- */
+  .strip {
+    background: var(--bg-raised);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .strip-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+  .strip-cell {
+    position: relative;
+    padding: 34px 30px;
+    border-left: 1px solid var(--rule);
+  }
+  .strip-cell:first-child { border-left: none; }
+  .strip-cell:not(:last-child)::after {
+    content: "\2192";
+    position: absolute;
+    top: 50%;
+    right: -11px;
+    transform: translateY(-50%);
+    width: 21px;
+    height: 21px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-raised);
+    border: 1px solid var(--rule-strong);
+    color: var(--emerald-bright);
+    font-size: 11px;
+    line-height: 1;
+    z-index: 1;
+  }
+  .strip-cell .eyebrow { color: var(--ink-faint); }
+  .strip-cell p { margin: 10px 0 0; font-size: 15px; color: var(--ink); }
+  .strip-cell p code {
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    color: var(--emerald-bright);
+    background: rgba(46,160,67,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ---------- the receipt itself: closing summary ---------- */
+  .receipt-block { padding: 64px 0 72px; }
+  .receipt {
+    position: relative;
+    max-width: 400px;
+    margin: 0 auto;
+    background: var(--receipt);
+    color: var(--receipt-ink);
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    padding: 28px 28px 22px;
+    box-shadow: 0 40px 80px -30px rgba(0,0,0,0.8);
+    transform: rotate(-0.6deg);
+  }
+  .receipt::before, .receipt::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 11px;
+    background:
+      linear-gradient(-45deg, var(--bg) 5.5px, transparent 0) 0 5.5px / 11px 11px repeat-x,
+      linear-gradient(45deg, var(--bg) 5.5px, transparent 0) 0 5.5px / 11px 11px repeat-x;
+  }
+  .receipt::before { top: -10px; }
+  .receipt::after { bottom: -10px; transform: scaleY(-1); }
+  .receipt .r-head { text-align: center; margin-bottom: 16px; }
+  .receipt .r-head .r-name {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: 20px;
+    letter-spacing: 0.01em;
+  }
+  .receipt .r-head .r-sub { color: #6b6f63; margin-top: 4px; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .receipt .r-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: #6b6f63;
+    padding: 10px 0;
+  }
+  .receipt .r-rule { border: none; border-top: 1px dashed #b8b6a8; margin: 0; }
+  .receipt .r-row { display: flex; align-items: baseline; gap: 6px; padding: 6px 0; }
+  .receipt .r-row span:first-child { color: #3a3d34; white-space: nowrap; }
+  .receipt .r-row span:last-child { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .receipt .r-dots {
+    flex: 1;
+    border-bottom: 1.5px dotted #a9ad9c;
+    transform: translateY(-3px);
+  }
+  .receipt .r-total { display: flex; justify-content: space-between; padding-top: 12px; font-size: 15px; font-weight: 700; }
+  .receipt .r-barcode {
+    height: 32px;
+    margin: 18px 2px 4px;
+    background-image: repeating-linear-gradient(90deg,
+      var(--receipt-ink) 0 1px, transparent 1px 3px,
+      var(--receipt-ink) 3px 5px, transparent 5px 6px,
+      var(--receipt-ink) 6px 6.5px, transparent 6.5px 9px,
+      var(--receipt-ink) 9px 11px, transparent 11px 12px,
+      var(--receipt-ink) 12px 12.5px, transparent 12.5px 15px
+    );
+    background-repeat: repeat-x;
+    opacity: 0.85;
+  }
+  .receipt .r-barcode-num { text-align: center; font-size: 10px; letter-spacing: 0.15em; color: #6b6f63; }
+  .receipt .r-foot { text-align: center; margin-top: 16px; color: #6b6f63; font-size: 11px; letter-spacing: 0.03em; }
+
+  .receipt-cta { text-align: center; margin-top: 40px; }
+  .receipt-cta p { color: var(--ink-dim); margin: 0 0 18px; }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top: 1px solid var(--rule);
+    padding: 30px 0 50px;
+  }
+  footer .wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  footer p, footer a {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    text-decoration: none;
+  }
+  footer a:hover { color: var(--emerald-bright); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .li-shot img, .hero-frame img { transition: transform 0.35s ease; }
+    .line-item:hover .li-shot img { transform: translateY(-4px); }
+
+    .line-item.reveal {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .line-item.reveal.is-visible { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 32px; gap: 32px; }
+    .hero-frame { justify-self: start; }
+    .hero-frame .shot-frame { width: 170px; }
+    .line-item, .line-item.reverse {
+      grid-template-columns: 84px 1fr;
+      gap: 18px;
+      align-items: start;
+      padding: 20px 0;
+    }
+    .line-item .li-shot { order: 1; }
+    .line-item .li-copy { order: 2; }
+    .cluster-break { margin: 4px 0 -2px; }
+    .li-shot .shot-frame { max-width: 84px; border-radius: 12px; }
+    .li-copy h3 { font-size: 18px; }
+    .li-copy p { font-size: 14px; }
+    .strip-grid { grid-template-columns: 1fr; }
+    .strip-cell { border-left: none; border-top: 1px solid var(--rule); }
+    .strip-cell:first-child { border-top: none; }
+    .strip-cell:not(:last-child)::after {
+      content: "\2193";
+      top: auto;
+      bottom: -11px;
+      right: 30px;
+      transform: none;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .wrap { padding: 0 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <span class="mark">holy_spend<strong>.mcp</strong></span>
+    <nav>
+      <a href="#how-it-works">How it works</a>
+      <a href="https://github.com/adi-sharma-96/holy-spend">Source</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <h1>Your spending, kept by<br>the <em>chat you already have open.</em></h1>
+      <p class="lede">A private expense and nutrition tracker with no app of its own. Forward a receipt, ask a question, get an honest answer, inside Claude, ChatGPT, Cursor, or anything else that speaks MCP.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/adi-sharma-96/holy-spend#readme">Read the setup guide</a>
+        <a class="btn btn-ghost" href="https://github.com/adi-sharma-96/holy-spend">View on GitHub</a>
+      </div>
+    </div>
+    <div class="hero-frame">
+      <div class="shot-frame">
+        <img src="images/overview.png" alt="Holy Spend's Overview card, inline in a chat">
+      </div>
+    </div>
+  </header>
+</div>
+
+<div class="perf"></div>
+
+<div class="wrap">
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">The problem with expense trackers</span>
+      <h2>Most of them make you do the bookkeeping.</h2>
+      <p>Type in every purchase, pick a category, remember to open the app. Holy Spend flips that. Forward a bill and it's logged, full stop. Itemize a grocery receipt instead and it goes further: per-unit pricing, price alerts, your own inflation number, a nutrition grade.</p>
+    </div>
+
+    <div class="line-item reverse">
+      <div class="li-copy">
+        <span class="eyebrow">[ email ]</span>
+        <h3>Forward a receipt email and it's already tracked</h3>
+        <p>Amazon, Uber Eats, Instacart, your gym, your internet bill, whatever. It reads the email, checks it against what you've bought before, and it's in there. You never touch an app.</p>
+        <span class="stat">source: email &middot; confirmed automatically</span>
+      </div>
+      <div class="li-shot">
+        <div class="shot-frame">
+          <img src="images/transaction-detail-email.png" alt="Transaction detail showing Email as the source, auto-confirmed by the scheduled ingestion task">
+        </div>
+      </div>
+    </div>
+
+    <div class="cluster-break"><span>From here: itemized groceries</span></div>
+
+    <div class="line-item">
+      <div class="li-copy">
+        <span class="eyebrow">[ photo ]</span>
+        <h3>A photo gets you every item, priced per unit</h3>
+        <p>"$47.82 at Walmart" tells you nothing. This gets you 6 bananas at $1.52/kg, milk at $5.49 for 4L, every line separately, in a form you can actually compare the next time you buy the same thing. No separate OCR bill either, it's the model you're already paying for doing the reading.</p>
+        <span class="stat tabular">12 lines &middot; priced per kg / L / unit</span>
+      </div>
+      <div class="li-shot">
+        <div class="shot-frame">
+          <img src="images/chatgpt-receipt-add.png" alt="Attaching a receipt PDF in ChatGPT">
+        </div>
+      </div>
+    </div>
+
+    <div class="line-item reverse">
+      <div class="li-copy">
+        <span class="eyebrow">[ price watch ]</span>
+        <h3>It notices price changes you'd never catch yourself</h3>
+        <p>It tracks price per unit on everything you buy more than once, sale sticker or not, and flags it the second something moves. Okra at FreshCo just doubled. Broccoli at Walmart is up 93%. Neither looked like a big deal at checkout.</p>
+        <span class="stat tabular">+100.2% &middot; okra, FreshCo</span>
+      </div>
+      <div class="li-shot">
+        <div class="shot-frame">
+          <img src="images/price-watch-inline.png" alt="Price Watch inline card">
+        </div>
+      </div>
+    </div>
+
+    <div class="line-item">
+      <div class="li-copy">
+        <span class="eyebrow">[ my inflation ]</span>
+        <h3>One inflation number that's actually about you</h3>
+        <p>Not the national number. Your own grocery basket, built only from things you buy more than once, priced honestly against what they cost you before.</p>
+        <span class="stat tabular">+10.2% &middot; 17 exact products</span>
+      </div>
+      <div class="li-shot">
+        <div class="shot-frame">
+          <img src="images/my-inflation.png" alt="My Inflation, inside Price Watch">
+        </div>
+      </div>
+    </div>
+
+    <div class="line-item reverse">
+      <div class="li-copy">
+        <span class="eyebrow">[ nutrition ]</span>
+        <h3>A grocery grade that means something</h3>
+        <p>A to E, weighted by what you actually spend on each thing, so a cart full of frozen pizza doesn't score the same as a cart full of vegetables just because they cost the same.</p>
+        <span class="stat">grade B &middot; 94% coverage</span>
+      </div>
+      <div class="li-shot">
+        <div class="shot-frame">
+          <img src="images/nutrition-inline.png" alt="Inline Nutrition card">
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="strip" id="how-it-works">
+  <div class="wrap">
+    <div class="strip-grid">
+      <div class="strip-cell">
+        <span class="eyebrow">01 &middot; database</span>
+        <p>A free <code>Supabase</code> project. Your data, your Postgres, nobody else's server.</p>
+      </div>
+      <div class="strip-cell">
+        <span class="eyebrow">02 &middot; backend</span>
+        <p>Two services on <code>Cloud Run</code> or <code>Railway</code>, both genuinely free at this scale.</p>
+      </div>
+      <div class="strip-cell">
+        <span class="eyebrow">03 &middot; connect</span>
+        <p>Add it as a connector in <code>Claude</code>, <code>ChatGPT</code>, or any MCP client. That's the whole app.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap receipt-block">
+  <div class="receipt">
+    <div class="r-head">
+      <div class="r-name">Holy Spend</div>
+      <div class="r-sub">Self-hosted &middot; single user</div>
+    </div>
+    <hr class="r-rule">
+    <div class="r-meta"><span>TXN #0001</span><span>REG: LOCALHOST</span></div>
+    <hr class="r-rule">
+    <div class="r-row"><span>Monthly hosting cost</span><span class="r-dots"></span><span>$0.00</span></div>
+    <div class="r-row"><span>Separate AI/OCR bill</span><span class="r-dots"></span><span>$0.00</span></div>
+    <div class="r-row"><span>Data leaving your database</span><span class="r-dots"></span><span>$0.00</span></div>
+    <div class="r-row"><span>New app to open</span><span class="r-dots"></span><span>$0.00</span></div>
+    <div class="r-row"><span>License</span><span class="r-dots"></span><span>MIT</span></div>
+    <hr class="r-rule">
+    <div class="r-total"><span>Total</span><span>Yours to run</span></div>
+    <div class="r-barcode"></div>
+    <div class="r-barcode-num">HOLY-SPEND-MIT-0001</div>
+    <div class="r-foot">THANK YOU &middot; KEEP THIS RECEIPT</div>
+  </div>
+  <div class="receipt-cta">
+    <p>Ten minutes of setup, and it's watching from inside your own chat.</p>
+    <a class="btn btn-primary" href="https://github.com/adi-sharma-96/holy-spend#readme">Get started &rarr;</a>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>Holy Spend &middot; MIT licensed &middot; self-hosted</p>
+    <a href="https://github.com/adi-sharma-96/holy-spend">github.com/adi-sharma-96/holy-spend</a>
+  </div>
+</footer>
+
+<script>
+  if (window.matchMedia("(prefers-reduced-motion: no-preference)").matches) {
+    var items = document.querySelectorAll(".line-item");
+    items.forEach(function (el) { el.classList.add("reveal"); });
+    var io = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -60px 0px" }
+    );
+    items.forEach(function (el) { io.observe(el); });
+  }
+</script>
+
+</body>
+</html>

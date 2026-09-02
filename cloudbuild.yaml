@@ -1,0 +1,69 @@
+steps:
+  # Cloud Build gives every run a brand-new machine with no carried-over
+  # Docker layer cache (unlike Railway's persistent builder). Two prior
+  # attempts here (classic --cache-from, then BuildKit inline cache) both
+  # failed to cache the widget-builder stage specifically: classic
+  # --cache-from only ever caches a multi-stage build's final stage, and
+  # inline cache (BUILDKIT_INLINE_CACHE=1) only embeds cache data for
+  # layers that end up in the final image - widget-builder's layers are
+  # discarded after COPY --from=widget-builder, so neither approach ever
+  # captured them, regardless of how many times it ran. The default
+  # buildx builder (driver=docker) has the same inline-cache-only
+  # limitation; only the docker-container driver's registry cache
+  # exporter with mode=max explicitly captures every stage, including
+  # discarded intermediate ones - the actual fix, not a variant of the
+  # same fix.
+  - name: "gcr.io/cloud-builders/docker"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker buildx create --name ci-builder --driver docker-container --use --bootstrap
+        docker buildx build \
+          --cache-from type=registry,ref=us-central1-docker.pkg.dev/$PROJECT_ID/holy-spend/buildcache \
+          --cache-to type=registry,ref=us-central1-docker.pkg.dev/$PROJECT_ID/holy-spend/buildcache,mode=max \
+          -t us-central1-docker.pkg.dev/$PROJECT_ID/holy-spend/app:$SHORT_SHA \
+          -t us-central1-docker.pkg.dev/$PROJECT_ID/holy-spend/app:latest \
+          --push \
+          .
+
+  # Only the image changes here - env vars, ingress/auth settings, and IAM
+  # bindings already configured on the service carry forward untouched
+  # (Cloud Run's own documented behavior for a deploy that doesn't
+  # explicitly override them). Deliberately not re-passing
+  # --no-allow-unauthenticated/--allow-unauthenticated here: they're
+  # already correctly set from the original deploy, and re-asserting them
+  # on every build needs roles/run.admin (an IAM-policy-write permission
+  # the build's service account doesn't have and doesn't need) just to
+  # redundantly confirm something that's already true.
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - holy-spend-mcp
+      - --image=us-central1-docker.pkg.dev/$PROJECT_ID/holy-spend/app:$SHORT_SHA
+      - --region=us-central1
+
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - holy-spend-api
+      - --image=us-central1-docker.pkg.dev/$PROJECT_ID/holy-spend/app:$SHORT_SHA
+      - --region=us-central1
+      - --service-account=holy-spend-api@$PROJECT_ID.iam.gserviceaccount.com
+
+# No top-level images: list here on purpose. That field makes Cloud Build
+# verify the listed images exist in the *local* Docker daemon after the
+# build, to record their digests - but `docker buildx build --push` with
+# the docker-container driver pushes straight from an isolated builder
+# container and never touches the local daemon at all, so that check
+# fails even though the images are genuinely in the registry (both deploy
+# steps above already proved that by successfully pulling and running
+# them). Omitting it just means Cloud Build's own Build Artifacts tab
+# doesn't list these images - a bookkeeping loss, not a functional one.
+
+options:
+  logging: CLOUD_LOGGING_ONLY

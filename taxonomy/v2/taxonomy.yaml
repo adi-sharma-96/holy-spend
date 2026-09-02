@@ -1,0 +1,1618 @@
+version: 2.0.0
+levels:
+  - Domain
+  - Group
+  - Category
+  - Subcategory
+  - Class
+  - Subclass
+
+nodes:
+  - key: food_dining
+    name: Food & Dining
+    description: Food, beverages, groceries, restaurant meals, and prepared food services.
+    children:
+      - key: groceries
+        name: Groceries
+        description: Food and beverages purchased for consumption away from a food-service venue.
+        synonyms: [grocery, supermarket food, food shopping]
+        children:
+          - key: produce
+            name: Produce
+            children:
+              - key: fruit
+                name: Fruit
+                children:
+                  - key: apples_pears
+                    name: Apples & Pears
+                    synonyms: [apples, pears, pome fruit]
+                    children:
+                      - key: apples
+                        name: Apples
+                      - key: pears
+                        name: Pears
+                  - key: bananas_plantains
+                    name: Bananas & Plantains
+                    synonyms: [bananas, plantains]
+                    children:
+                      - key: bananas
+                        name: Bananas
+                      - key: plantains
+                        name: Plantains
+                  - key: berries
+                    name: Berries
+                    synonyms: [strawberries, blueberries, raspberries, blackberries]
+                    children:
+                      - key: strawberries
+                        name: Strawberries
+                      - key: blueberries
+                        name: Blueberries
+                      - key: raspberries
+                        name: Raspberries
+                      - key: blackberries
+                        name: Blackberries
+                      - key: mixed_berries
+                        name: Mixed & Other Berries
+                  - key: citrus
+                    name: Citrus Fruit
+                    synonyms: [oranges, lemons, limes, grapefruit, mandarins]
+                    children:
+                      - key: oranges
+                        name: Oranges
+                      - key: lemons
+                        name: Lemons
+                      - key: limes
+                        name: Limes
+                      - key: grapefruit
+                        name: Grapefruit
+                      - key: mandarins
+                        name: Mandarins
+                  - key: grapes
+                    name: Grapes
+                  - key: melons
+                    name: Melons
+                    synonyms: [watermelon, cantaloupe, honeydew]
+                    children:
+                      - key: watermelon
+                        name: Watermelon
+                      - key: cantaloupe
+                        name: Cantaloupe
+                      - key: honeydew
+                        name: Honeydew
+                  - key: stone_fruit
+                    name: Stone Fruit
+                    synonyms: [peaches, nectarines, plums, cherries, apricots]
+                    children:
+                      - key: peaches
+                        name: Peaches
+                      - key: nectarines
+                        name: Nectarines
+                      - key: plums
+                        name: Plums
+                      - key: cherries
+                        name: Cherries
+                      - key: apricots
+                        name: Apricots
+                  - key: tropical
+                    name: Tropical Fruit
+                    synonyms: [mangoes, pineapples, papayas, coconuts, guavas]
+                    children:
+                      - key: mangoes
+                        name: Mangoes
+                      - key: pineapples
+                        name: Pineapples
+                      - key: papayas
+                        name: Papayas
+                      - key: coconuts
+                        name: Coconuts
+                      - key: guavas
+                        name: Guavas
+                      - key: avocados
+                        name: Avocados
+                      - key: tropical_other
+                        name: Other Tropical Fruit
+                        synonyms: [litchi, lychee, rambutan, dragon fruit, passion fruit]
+                  - key: dried_fruit
+                    name: Dried Fruit
+                    synonyms: [raisins, dates, prunes, dried apricots]
+                  - key: mixed_fruit
+                    name: Mixed & Other Fruit
+                    synonyms: [fruit tray, mixed fruit]
+              - key: vegetables
+                name: Vegetables
+                children:
+                  - key: leafy_greens
+                    name: Leafy Greens
+                    synonyms: [lettuce, spinach, kale, chard, arugula]
+                    children:
+                      - key: lettuce
+                        name: Lettuce
+                      - key: spinach
+                        name: Spinach
+                      - key: kale
+                        name: Kale
+                      - key: chard
+                        name: Chard
+                      - key: arugula
+                        name: Arugula
+                  - key: cruciferous
+                    name: Cruciferous Vegetables
+                    synonyms: [broccoli, cauliflower, cabbage, brussels sprouts]
+                    children:
+                      - key: broccoli
+                        name: Broccoli
+                      - key: cauliflower
+                        name: Cauliflower
+                      - key: cabbage
+                        name: Cabbage
+                      - key: brussels_sprouts
+                        name: Brussels Sprouts
+                  - key: roots_tubers
+                    name: Roots & Tubers
+                    synonyms: [carrots, beets, radishes, turnips, cassava]
+                    children:
+                      - key: carrots
+                        name: Carrots
+                      - key: beets
+                        name: Beets
+                      - key: radishes
+                        name: Radishes
+                      - key: turnips
+                        name: Turnips
+                      - key: cassava
+                        name: Cassava
+                  - key: potatoes
+                    name: Potatoes & Sweet Potatoes
+                    synonyms: [potatoes, sweet potatoes, yams]
+                    children:
+                      - key: regular_potatoes
+                        name: Potatoes
+                      - key: sweet_potatoes
+                        name: Sweet Potatoes
+                        synonyms: [yams]
+                  - key: alliums
+                    name: Alliums
+                    synonyms: [onions, garlic, leeks, shallots, scallions]
+                    children:
+                      - key: onions
+                        name: Onions
+                      - key: garlic
+                        name: Garlic
+                      - key: leeks
+                        name: Leeks
+                      - key: shallots
+                        name: Shallots
+                      - key: scallions
+                        name: Scallions
+                  - key: nightshades
+                    name: Nightshades
+                    children:
+                      - key: tomatoes
+                        name: Tomatoes
+                        synonyms: [tomato, tomatoes on the vine, roma tomatoes]
+                      - key: peppers
+                        name: Peppers
+                        synonyms: [bell peppers, chilli peppers, jalapenos]
+                      - key: eggplants
+                        name: Eggplants
+                        synonyms: [eggplant, aubergine, brinjal]
+                  - key: squash_gourds
+                    name: Squash & Gourds
+                    synonyms: [zucchini, cucumber, pumpkin, squash, gourds]
+                    children:
+                      - key: zucchini
+                        name: Zucchini
+                      - key: cucumbers
+                        name: Cucumbers
+                      - key: pumpkin
+                        name: Pumpkin
+                      - key: squash
+                        name: Squash
+                        synonyms: [gourds]
+                  - key: stalk_pod
+                    name: Stalk & Pod Vegetables
+                    synonyms: [celery, asparagus, green beans, peas, okra]
+                    children:
+                      - key: celery
+                        name: Celery
+                      - key: asparagus
+                        name: Asparagus
+                      - key: green_beans
+                        name: Green Beans
+                      - key: peas
+                        name: Peas
+                      - key: okra
+                        name: Okra
+                        synonyms: [bhindi]
+                  - key: mushrooms
+                    name: Mushrooms
+                  - key: mixed_vegetables
+                    name: Mixed & Other Vegetables
+                    synonyms: [mixed vegetables, vegetable tray]
+              - key: herbs_aromatics
+                name: Fresh Herbs & Aromatics
+                synonyms: [cilantro, parsley, basil, mint, ginger, lemongrass]
+                children:
+                  - key: ginger
+                    name: Ginger
+                  - key: cilantro
+                    name: Cilantro
+                  - key: parsley
+                    name: Parsley
+                  - key: basil
+                    name: Basil
+                  - key: mint
+                    name: Mint
+                  - key: other_herbs
+                    name: Other Fresh Herbs & Aromatics
+                    synonyms: [lemongrass]
+              - key: salads_kits
+                name: Salads & Produce Kits
+                synonyms: [salad kits, chopped salad, fruit tray, vegetable tray]
+          - key: dairy_eggs
+            name: Dairy & Eggs
+            children:
+              - key: milk
+                name: Milk
+                children:
+                  - key: cows_milk
+                    name: Cow's Milk
+                    synonyms: [whole milk, skim milk, 2 percent milk, homogenized milk]
+                    children:
+                      - key: fresh_milk
+                        name: Milk
+                        synonyms: [whole milk, skim milk, 2 percent milk, homogenized milk]
+                      - key: condensed_evaporated_milk
+                        name: Condensed & Evaporated Milk
+                        synonyms: [sweetened condensed milk, evaporated milk]
+                  - key: specialty_milk
+                    name: Specialty Animal Milk
+                    synonyms: [goat milk, sheep milk, lactose-free milk]
+              - key: cream
+                name: Cream & Creamers
+                synonyms: [whipping cream, table cream, coffee cream]
+              - key: yogurt_fermented
+                name: Yogurt & Fermented Dairy
+                children:
+                  - key: yogurt
+                    name: Yogurt
+                    synonyms: [greek yogurt, plain yogurt, flavoured yogurt]
+                  - key: fermented_drinks
+                    name: Fermented Dairy Drinks
+                    synonyms: [kefir, lassi, yogurt drink]
+              - key: cheese
+                name: Cheese
+                children:
+                  - key: fresh_soft
+                    name: Fresh & Soft Cheese
+                    synonyms: [paneer, ricotta, cottage cheese, cream cheese, mozzarella, feta]
+                    children:
+                      - key: paneer
+                        name: Paneer
+                      - key: ricotta
+                        name: Ricotta
+                      - key: cottage_cheese
+                        name: Cottage Cheese
+                      - key: cream_cheese
+                        name: Cream Cheese
+                      - key: mozzarella
+                        name: Mozzarella
+                      - key: feta
+                        name: Feta
+                  - key: semi_soft
+                    name: Semi-Soft Cheese
+                    synonyms: [havarti, brie, camembert]
+                  - key: hard_aged
+                    name: Hard & Aged Cheese
+                    synonyms: [cheddar, parmesan, gouda, swiss cheese]
+                    children:
+                      - key: cheddar
+                        name: Cheddar
+                      - key: parmesan
+                        name: Parmesan
+                      - key: gouda
+                        name: Gouda
+                      - key: swiss_cheese
+                        name: Swiss Cheese
+                  - key: processed
+                    name: Processed Cheese
+                    synonyms: [cheese slices, cheese spread]
+              - key: butter_fats
+                name: Butter & Dairy Fats
+                synonyms: [butter, ghee]
+                children:
+                  - key: butter
+                    name: Butter
+                  - key: ghee
+                    name: Ghee
+              - key: eggs
+                name: Eggs & Egg Products
+                synonyms: [eggs, egg whites, liquid eggs]
+              - key: dairy_alternatives
+                name: Dairy Alternatives
+                children:
+                  - key: plant_milk
+                    name: Plant-Based Milk
+                    synonyms: [oat milk, almond milk, soy milk, coconut milk beverage]
+                    children:
+                      - key: oat_milk
+                        name: Oat Milk
+                      - key: almond_milk
+                        name: Almond Milk
+                      - key: soy_milk
+                        name: Soy Milk
+                      - key: coconut_milk_beverage
+                        name: Coconut Milk Beverage
+                  - key: plant_yogurt
+                    name: Plant-Based Yogurt
+                  - key: plant_cheese
+                    name: Plant-Based Cheese
+          - key: meat_seafood_alternatives
+            name: Meat, Seafood & Alternatives
+            children:
+              - key: meat_poultry
+                name: Meat & Poultry
+                children:
+                  - key: beef
+                    name: Beef
+                  - key: pork
+                    name: Pork
+                  - key: chicken
+                    name: Chicken
+                  - key: turkey
+                    name: Turkey
+                  - key: lamb_goat
+                    name: Lamb & Goat
+                  - key: deli_prepared_meat
+                    name: Deli & Prepared Meat
+                    synonyms: [cold cuts, sausages, bacon, deli meat]
+              - key: seafood
+                name: Seafood
+                children:
+                  - key: fish
+                    name: Fish
+                    children:
+                      - key: salmon
+                        name: Salmon
+                      - key: tuna
+                        name: Tuna
+                      - key: tilapia
+                        name: Tilapia
+                      - key: cod
+                        name: Cod
+                      - key: other_fish
+                        name: Other Fish
+                  - key: shellfish
+                    name: Shellfish
+                    synonyms: [shrimp, prawns, crab, lobster, mussels]
+                    children:
+                      - key: shrimp
+                        name: Shrimp
+                        synonyms: [prawns]
+                      - key: crab
+                        name: Crab
+                      - key: lobster
+                        name: Lobster
+                      - key: mussels
+                        name: Mussels
+                  - key: prepared_seafood
+                    name: Prepared Seafood
+              - key: plant_proteins
+                name: Plant Proteins
+                children:
+                  - key: tofu_tempeh
+                    name: Tofu & Tempeh
+                    children:
+                      - key: tofu
+                        name: Tofu
+                      - key: tempeh
+                        name: Tempeh
+                  - key: seitan
+                    name: Seitan
+                  - key: meat_alternatives
+                    name: Meat Alternatives
+                    synonyms: [plant-based burgers, vegan meat, meat substitutes]
+          - key: bread_bakery
+            name: Bread & Bakery
+            children:
+              - key: bread
+                name: Bread & Loaves
+                synonyms: [bread, sourdough, sandwich bread]
+              - key: flatbreads
+                name: Flatbreads
+                synonyms: [naan, roti, pita, tortillas]
+                children:
+                  - key: naan
+                    name: Naan
+                  - key: roti
+                    name: Roti
+                  - key: pita
+                    name: Pita
+                  - key: tortillas
+                    name: Tortillas
+                  - key: phulka
+                    name: Phulka
+              - key: buns_rolls
+                name: Buns & Rolls
+              - key: pastries
+                name: Pastries
+                synonyms: [croissants, danishes, muffins, doughnuts]
+                children:
+                  - key: croissants
+                    name: Croissants
+                  - key: danishes
+                    name: Danishes
+                  - key: muffins
+                    name: Muffins
+                  - key: doughnuts
+                    name: Doughnuts
+              - key: cakes_desserts
+                name: Cakes & Bakery Desserts
+          - key: grains_pasta
+            name: Grains, Rice & Pasta
+            children:
+              - key: rice
+                name: Rice
+                children:
+                  - key: long_grain
+                    name: Long-Grain Rice
+                    synonyms: [basmati rice, jasmine rice, long grain rice]
+                  - key: short_medium_grain
+                    name: Short & Medium-Grain Rice
+                    synonyms: [sushi rice, arborio rice, calrose rice]
+                  - key: brown_wild
+                    name: Brown & Wild Rice
+                  - key: prepared_rice
+                    name: Prepared Rice
+                    synonyms: [instant rice, microwave rice]
+              - key: pasta
+                name: Pasta
+                synonyms: [spaghetti, macaroni, penne, lasagna]
+              - key: noodles
+                name: Noodles
+                synonyms: [ramen, rice noodles, egg noodles, udon]
+                children:
+                  - key: ramen
+                    name: Ramen
+                  - key: rice_noodles
+                    name: Rice Noodles
+                  - key: egg_noodles
+                    name: Egg Noodles
+                  - key: udon
+                    name: Udon
+                  - key: instant_noodles
+                    name: Instant Noodles
+                    synonyms: [ramen noodles, cup noodles, instant ramen]
+              - key: vermicelli
+                name: Vermicelli
+                synonyms: [seviyan, semiya, roasted vermicelli]
+              - key: oats
+                name: Oats & Hot Cereal
+                synonyms: [oatmeal, rolled oats, steel cut oats]
+              - key: whole_grains
+                name: Whole Grains
+                synonyms: [quinoa, barley, farro, millet, bulgur]
+                children:
+                  - key: quinoa
+                    name: Quinoa
+                  - key: barley
+                    name: Barley
+                  - key: farro
+                    name: Farro
+                  - key: millet
+                    name: Millet
+                  - key: bulgur
+                    name: Bulgur
+              - key: flour
+                name: Flour
+                synonyms: [all-purpose flour, atta, bread flour, chickpea flour]
+                children:
+                  - key: all_purpose_flour
+                    name: All-Purpose Flour
+                  - key: atta
+                    name: Atta
+                  - key: bread_flour
+                    name: Bread Flour
+                  - key: chickpea_flour
+                    name: Chickpea Flour
+          - key: pantry_cooking
+            name: Pantry & Cooking
+            children:
+              - key: pulses_legumes
+                name: Pulses & Legumes
+                children:
+                  - key: lentils
+                    name: Lentils
+                    synonyms: [dal, toor dal, masoor dal, moong dal]
+                  - key: beans
+                    name: Beans
+                    synonyms: [kidney beans, black beans, navy beans]
+                    children:
+                      - key: black_beans
+                        name: Black Beans
+                      - key: kidney_beans
+                        name: Kidney Beans
+                        synonyms: [rajma]
+                      - key: navy_beans
+                        name: Navy Beans
+                  - key: chickpeas
+                    name: Chickpeas
+                    synonyms: [kabuli chana, garbanzo beans, chana]
+                  - key: peas
+                    name: Dried Peas
+              - key: oils_vinegars
+                name: Oils & Vinegars
+                synonyms: [olive oil, cooking oil, vinegar]
+                children:
+                  - key: olive_oil
+                    name: Olive Oil
+                  - key: cooking_oil
+                    name: Cooking Oil
+                    synonyms: [vegetable oil, sunflower oil, canola oil]
+                  - key: vinegar
+                    name: Vinegar
+              - key: sauces_condiments
+                name: Sauces & Condiments
+                synonyms: [ketchup, mustard, mayonnaise, hot sauce, soy sauce]
+                children:
+                  - key: pasta_sauce
+                    name: Pasta Sauce
+                  - key: ketchup
+                    name: Ketchup
+                  - key: mustard
+                    name: Mustard
+                  - key: mayonnaise
+                    name: Mayonnaise
+                  - key: hot_sauce
+                    name: Hot Sauce
+                  - key: soy_sauce
+                    name: Soy Sauce
+                  - key: other_condiments
+                    name: Other Condiments
+                    synonyms: [pickle, relish, chutney, burger sauce, specialty sauce]
+              - key: spices_seasonings
+                name: Spices & Seasonings
+                synonyms: [spices, seasoning, masala, salt, pepper]
+              - key: canned_jarred
+                name: Canned & Jarred Foods
+              - key: cooking_bases
+                name: Cooking Bases & Stocks
+                synonyms: [stock, broth, curry paste, cooking sauce]
+                children:
+                  - key: ginger_garlic_paste
+                    name: Ginger Garlic Paste
+                  - key: garlic_paste
+                    name: Garlic Paste
+                  - key: stock_broth
+                    name: Stock & Broth
+                  - key: curry_paste
+                    name: Curry Paste
+              - key: baking_ingredients
+                name: Baking Ingredients
+                synonyms: [baking powder, yeast, cocoa powder, chocolate chips]
+              - key: sweeteners
+                name: Sugar & Sweeteners
+                synonyms: [sugar, honey, maple syrup, artificial sweetener]
+                children:
+                  - key: sugar
+                    name: Sugar
+                  - key: honey
+                    name: Honey
+                  - key: maple_syrup
+                    name: Maple Syrup
+                  - key: artificial_sweetener
+                    name: Artificial Sweetener
+              - key: spreads
+                name: Spreads
+                synonyms: [jam, peanut butter, nut butter, chocolate spread]
+                children:
+                  - key: jam
+                    name: Jam
+                  - key: peanut_butter
+                    name: Peanut Butter
+                  - key: nut_butter
+                    name: Nut Butter
+                  - key: chocolate_spread
+                    name: Chocolate Spread
+          - key: breakfast
+            name: Breakfast Foods
+            children:
+              - key: cereal_granola
+                name: Cereal & Granola
+              - key: breakfast_bars
+                name: Breakfast Bars
+              - key: pancake_waffle
+                name: Pancake & Waffle Products
+          - key: snacks_confectionery
+            name: Snacks & Confectionery
+            children:
+              - key: savoury_snacks
+                name: Savoury Snacks
+                synonyms: [chips, crisps, namkeen, snack mix]
+              - key: crackers
+                name: Crackers
+              - key: nuts_seeds
+                name: Nuts & Seeds
+                children:
+                  - key: almonds
+                    name: Almonds
+                  - key: cashews
+                    name: Cashews
+                  - key: walnuts
+                    name: Walnuts
+                  - key: pistachios
+                    name: Pistachios
+                  - key: peanuts
+                    name: Peanuts
+                  - key: sunflower_seeds
+                    name: Sunflower Seeds
+                  - key: mixed_nuts
+                    name: Mixed Nuts
+              - key: chocolate
+                name: Chocolate
+              - key: candy
+                name: Candy & Confectionery
+              - key: cookies
+                name: Cookies, Biscuits & Wafers
+              - key: snack_bars
+                name: Snack & Protein Bars
+              - key: popcorn
+                name: Popcorn
+          - key: frozen_food
+            name: Frozen Food
+            children:
+              - key: frozen_produce
+                name: Frozen Produce
+              - key: frozen_meals
+                name: Frozen Meals
+              - key: frozen_protein
+                name: Frozen Protein
+              - key: frozen_snacks
+                name: Frozen Snacks
+              - key: ice_cream_desserts
+                name: Ice Cream & Frozen Desserts
+          - key: prepared_food
+            name: Prepared Food
+            children:
+              - key: ready_meals
+                name: Ready Meals
+              - key: deli_food
+                name: Deli & Prepared Foods
+              - key: salads
+                name: Prepared Salads
+              - key: sandwiches
+                name: Sandwiches & Wraps
+              - key: meal_kits
+                name: Meal Kits
+          - key: beverages
+            name: Beverages
+            children:
+              - key: water
+                name: Water
+              - key: coffee
+                name: Coffee
+              - key: tea
+                name: Tea
+              - key: juice
+                name: Juice
+              - key: soft_drinks
+                name: Soft Drinks
+              - key: energy_sports
+                name: Energy & Sports Drinks
+              - key: non_alcoholic
+                name: Non-Alcoholic Alternatives
+              - key: beer
+                name: Beer
+              - key: wine
+                name: Wine
+              - key: spirits
+                name: Spirits
+          - key: nutrition_supplements
+            name: Nutrition & Meal Supplements
+            children:
+              - key: protein_supplements
+                name: Protein Supplements
+              - key: sports_foods
+                name: Sports Nutrition Foods
+              - key: meal_replacements
+                name: Meal Replacements
+      - key: eating_out
+        name: Eating Out
+        description: Prepared food or drink purchased from a food-service provider.
+        synonyms: [restaurants, dining out, takeout]
+        children:
+          - key: restaurants
+            name: Restaurants
+            children:
+              - key: full_service
+                name: Full-Service Restaurant Meal
+              - key: casual
+                name: Casual Restaurant Meal
+              - key: buffet
+                name: Buffet Meal
+          - key: quick_service
+            name: Quick-Service Restaurants
+            synonyms: [fast food, counter service]
+          - key: cafes_bakeries
+            name: Cafés & Bakeries
+            synonyms: [coffee shop, cafe meal]
+          - key: bars_nightlife
+            name: Bars & Nightlife
+          - key: takeout
+            name: Takeout
+          - key: delivery
+            name: Restaurant Delivery
+            synonyms: [food delivery, uber eats, doordash, skip]
+          - key: food_courts
+            name: Food Courts
+          - key: workplace_school
+            name: Workplace & School Meals
+          - key: catering
+            name: Catering
+
+  - key: housing_utilities
+    name: Housing & Utilities
+    description: Housing occupancy, utilities, household operations, and home upkeep.
+    children:
+      - key: housing_payments
+        name: Housing Payments
+        children:
+          - key: rent
+            name: Residential Rent
+          - key: mortgage_interest
+            name: Mortgage Interest
+          - key: condo_hoa
+            name: Condo & HOA Fees
+          - key: property_tax
+            name: Property Taxes
+      - key: utilities
+        name: Utilities
+        children:
+          - key: electricity
+            name: Electricity
+          - key: natural_gas
+            name: Natural Gas Utility
+          - key: water
+            name: Water Utility
+          - key: waste_recycling
+            name: Waste & Recycling
+      - key: communications
+        name: Communications
+        children:
+          - key: home_internet
+            name: Home Internet
+          - key: mobile_service
+            name: Mobile Service
+          - key: landline
+            name: Landline
+          - key: cable_bundles
+            name: Cable & Communications Bundles
+      - key: household_operations
+        name: Household Operations
+        children:
+          - key: cleaning_supplies
+            name: Cleaning Supplies
+          - key: laundry_supplies
+            name: Laundry Supplies
+          - key: dishwashing_supplies
+            name: Dishwashing Supplies
+          - key: paper_disposables
+            name: Paper & Disposable Goods
+          - key: kitchen_consumables
+            name: Kitchen Consumables
+          - key: storage_organization
+            name: Storage & Organization
+          - key: pest_control_products
+            name: Pest Control Products
+          - key: air_care
+            name: Air Care
+      - key: home_services
+        name: Home Services
+        children:
+          - key: cleaning
+            name: Home Cleaning
+          - key: lawn_garden
+            name: Lawn & Garden Services
+          - key: pest_control
+            name: Pest Control Services
+          - key: security
+            name: Home Security
+          - key: moving_storage
+            name: Moving & Storage Services
+      - key: maintenance_repairs
+        name: Maintenance & Repairs
+        children:
+          - key: plumbing
+            name: Plumbing
+          - key: electrical
+            name: Electrical
+          - key: hvac
+            name: HVAC
+          - key: appliances
+            name: Appliance Repair
+          - key: general_repairs
+            name: General Home Repairs
+      - key: furnishings_home_goods
+        name: Furnishings & Home Goods
+        children:
+          - key: furniture
+            name: Furniture
+          - key: kitchenware
+            name: Kitchenware
+          - key: bedding
+            name: Bedding
+          - key: decor
+            name: Home Décor
+          - key: lighting
+            name: Lighting
+      - key: home_insurance
+        name: Home Insurance
+        children:
+          - key: homeowner
+            name: Homeowner Insurance
+          - key: renter
+            name: Renter Insurance
+          - key: mortgage
+            name: Mortgage Insurance
+
+  - key: transportation
+    name: Transportation
+    description: Personal vehicles, transit, rides, parking, and other local transportation.
+    children:
+      - key: personal_vehicle
+        name: Personal Vehicle
+        children:
+          - key: fuel
+            name: Fuel
+            children:
+              - key: gasoline
+                name: Gasoline
+              - key: diesel
+                name: Diesel
+              - key: other_fuel
+                name: Other Motor Fuel
+          - key: electric_charging
+            name: Electric Vehicle Charging
+          - key: maintenance
+            name: Vehicle Maintenance
+          - key: repairs
+            name: Vehicle Repairs
+          - key: tires
+            name: Tires
+          - key: parts_accessories
+            name: Parts & Accessories
+          - key: wash_detailing
+            name: Car Wash & Detailing
+          - key: parking
+            name: Parking
+          - key: tolls
+            name: Tolls
+          - key: registration_licensing
+            name: Registration & Licensing
+          - key: auto_insurance
+            name: Auto Insurance
+          - key: loan_interest
+            name: Vehicle Loan Interest
+          - key: lease
+            name: Vehicle Lease
+      - key: public_transit
+        name: Public Transit
+        children:
+          - key: bus
+            name: Bus
+          - key: subway
+            name: Subway
+          - key: commuter_rail
+            name: Commuter Rail
+          - key: ferry
+            name: Ferry
+          - key: pass
+            name: Transit Pass
+      - key: taxi_rideshare
+        name: Taxi & Rideshare
+      - key: cycling_micromobility
+        name: Cycling & Micromobility
+      - key: vehicle_rental
+        name: Vehicle Rental
+      - key: intercity_ground
+        name: Intercity Ground Transport
+
+  - key: health_wellness
+    name: Health & Wellness
+    description: Medical, pharmacy, dental, vision, mental health, fitness, and wellness spending.
+    children:
+      - key: medical_care
+        name: Medical Care
+        children:
+          - key: primary_care
+            name: Primary Care
+          - key: specialist
+            name: Specialist Care
+          - key: hospital
+            name: Hospital Care
+          - key: laboratory
+            name: Laboratory & Diagnostics
+          - key: physiotherapy
+            name: Physiotherapy
+      - key: dental
+        name: Dental Care
+      - key: vision
+        name: Vision Care
+      - key: mental_health
+        name: Mental Health Care
+      - key: pharmacy
+        name: Pharmacy
+        children:
+          - key: prescription
+            name: Prescription Medication
+          - key: otc
+            name: Over-the-Counter Medication
+          - key: first_aid
+            name: First Aid
+          - key: medical_supplies
+            name: Medical Supplies
+          - key: vitamins_supplements
+            name: Vitamins & Supplements
+      - key: health_devices
+        name: Health Devices
+      - key: health_insurance
+        name: Health Insurance
+      - key: fitness
+        name: Fitness
+        children:
+          - key: gym
+            name: Gym Membership
+          - key: classes
+            name: Fitness Classes
+          - key: sports_fees
+            name: Sports Fees
+          - key: equipment
+            name: Fitness Equipment
+      - key: wellness_services
+        name: Wellness Services
+
+  - key: personal_care
+    name: Personal Care
+    description: Personal grooming, hygiene, cosmetics, and beauty services.
+    children:
+      - key: products
+        name: Personal Care Products
+        children:
+          - key: hair
+            name: Hair Care Products
+          - key: skin
+            name: Skin Care Products
+          - key: oral
+            name: Oral Care Products
+          - key: bath_body
+            name: Bath & Body Products
+          - key: cosmetics
+            name: Cosmetics
+          - key: fragrance
+            name: Fragrance
+          - key: hygiene
+            name: Hygiene Products
+      - key: services
+        name: Personal Care Services
+        children:
+          - key: haircut_styling
+            name: Haircuts & Styling
+          - key: beauty
+            name: Beauty Services
+          - key: spa_massage
+            name: Spa & Massage
+
+  - key: family_dependants_pets
+    name: Family, Dependants & Pets
+    description: Care and supplies for children, dependants, elders, and pets.
+    children:
+      - key: children
+        name: Children & Baby
+        children:
+          - key: childcare
+            name: Childcare
+          - key: school_age_care
+            name: School-Age Care
+          - key: baby_food_formula
+            name: Baby Food & Formula
+          - key: diapers_hygiene
+            name: Diapers & Baby Hygiene
+          - key: baby_gear
+            name: Baby Gear
+          - key: activities
+            name: Children's Activities
+      - key: elder_family_care
+        name: Elder & Family Care
+        children:
+          - key: elder_care
+            name: Elder Care
+          - key: family_support
+            name: Family Support
+      - key: pets
+        name: Pets
+        children:
+          - key: food
+            name: Pet Food
+          - key: treats
+            name: Pet Treats
+          - key: supplies
+            name: Pet Supplies
+          - key: veterinary
+            name: Veterinary Care
+          - key: grooming
+            name: Pet Grooming
+          - key: boarding_walking
+            name: Boarding & Walking
+          - key: insurance
+            name: Pet Insurance
+
+  - key: shopping_retail
+    name: Shopping & Retail
+    description: Durable and discretionary retail goods not classified by a more specific life purpose.
+    children:
+      - key: clothing
+        name: Clothing
+        children:
+          - key: mens
+            name: Men's Clothing
+          - key: womens
+            name: Women's Clothing
+          - key: childrens
+            name: Children's Clothing
+          - key: workwear
+            name: Workwear
+      - key: footwear
+        name: Footwear
+      - key: accessories
+        name: Accessories
+      - key: jewellery
+        name: Jewellery
+      - key: electronics
+        name: Electronics
+        children:
+          - key: computers_mobile
+            name: Computers & Mobile Devices
+          - key: audio_video
+            name: Audio & Video Electronics
+          - key: accessories
+            name: Electronic Accessories
+      - key: appliances
+        name: Appliances
+      - key: office_supplies
+        name: Office Supplies
+      - key: books_media
+        name: Books & Printed Media
+      - key: hobbies_crafts
+        name: Hobbies & Crafts
+      - key: sporting_goods
+        name: Sporting Goods
+      - key: seasonal
+        name: Seasonal & Holiday Goods
+      - key: general_merchandise
+        name: General Merchandise
+      - key: second_hand
+        name: Second-Hand Purchases
+
+  - key: entertainment_leisure
+    name: Entertainment & Leisure
+    description: Media, events, games, attractions, and recreational experiences.
+    children:
+      - key: cinema
+        name: Cinema
+        children:
+          - key: admission
+            name: Movie Ticket
+          - key: concessions
+            name: Cinema Concessions
+      - key: live_events
+        name: Live Events
+        children:
+          - key: concerts
+            name: Concerts
+          - key: theatre
+            name: Theatre
+          - key: comedy
+            name: Comedy
+          - key: festivals
+            name: Festivals
+      - key: sports_recreation
+        name: Sports & Recreation
+      - key: gaming
+        name: Gaming
+        children:
+          - key: games
+            name: Games
+          - key: hardware
+            name: Gaming Hardware
+          - key: in_app
+            name: In-App Purchases
+      - key: streaming_media
+        name: Streaming & Media
+        children:
+          - key: video
+            name: Video Streaming
+          - key: music
+            name: Music Streaming
+          - key: news
+            name: News & Publications
+      - key: clubs_memberships
+        name: Clubs & Memberships
+      - key: attractions
+        name: Attractions
+      - key: hobbies
+        name: Leisure Hobbies
+
+  - key: travel
+    name: Travel
+    description: Transportation, lodging, services, and activities associated with travel away from home.
+    children:
+      - key: airfare
+        name: Airfare
+      - key: lodging
+        name: Lodging
+      - key: rail_bus
+        name: Travel Rail & Bus
+      - key: local_transport
+        name: Travel Local Transportation
+      - key: car_rental
+        name: Travel Car Rental
+      - key: travel_insurance
+        name: Travel Insurance
+      - key: visas_documents
+        name: Visas & Documentation
+      - key: baggage_airline_fees
+        name: Baggage & Airline Fees
+      - key: tours_activities
+        name: Tours & Activities
+      - key: connectivity
+        name: Travel Connectivity
+
+  - key: education
+    name: Education
+    description: Formal education, courses, learning materials, and educational services.
+    children:
+      - key: tuition
+        name: Tuition
+      - key: courses
+        name: Courses
+      - key: certification
+        name: Certification
+      - key: books_materials
+        name: Books & Learning Materials
+      - key: tutoring
+        name: Tutoring
+      - key: school_fees
+        name: School Fees
+      - key: educational_software
+        name: Educational Software
+      - key: student_services
+        name: Student Services
+
+  - key: financial_services
+    name: Financial Services
+    description: Banking, borrowing, investing, accounting, and personal financial protection costs.
+    children:
+      - key: banking_fees
+        name: Banking Fees
+      - key: credit_card_interest
+        name: Credit Card Interest
+      - key: loan_interest
+        name: Loan Interest
+      - key: foreign_exchange
+        name: Foreign Exchange Fees
+      - key: investment_fees
+        name: Investment Fees
+      - key: accounting
+        name: Accounting
+      - key: life_insurance
+        name: Life Insurance
+      - key: disability_insurance
+        name: Disability Insurance
+
+  - key: work_professional
+    name: Work & Professional
+    description: Career, professional practice, and work-specific services and supplies.
+    children:
+      - key: memberships
+        name: Professional Memberships
+      - key: licensing
+        name: Professional Licensing
+      - key: coworking
+        name: Coworking
+      - key: career_services
+        name: Career Services
+      - key: software
+        name: Work Software
+      - key: contractors
+        name: Contractors
+      - key: equipment
+        name: Professional Equipment
+
+  - key: gifts_giving
+    name: Gifts & Giving
+    description: Gifts, charitable donations, and community or religious contributions.
+    children:
+      - key: personal_gifts
+        name: Personal Gifts
+      - key: charitable_donations
+        name: Charitable Donations
+      - key: religious_contributions
+        name: Religious Contributions
+      - key: community_support
+        name: Community Support
+
+  - key: government_legal
+    name: Government & Legal
+    description: Taxes, government charges, permits, penalties, and legal services.
+    children:
+      - key: income_taxes
+        name: Income Taxes
+      - key: government_fees
+        name: Government Fees
+      - key: permits_licences
+        name: Permits & Licences
+      - key: fines_penalties
+        name: Fines & Penalties
+      - key: legal_services
+        name: Legal Services
+      - key: immigration_services
+        name: Immigration Services
+
+  - key: income
+    name: Income
+    description: Money earned or received that is not a refund or account transfer.
+    transaction_types: [income]
+    children:
+      - key: employment
+        name: Employment Income
+      - key: freelance_business
+        name: Freelance & Business Income
+      - key: investment
+        name: Investment Income
+      - key: benefits
+        name: Benefits
+      - key: reimbursement
+        name: Reimbursements
+      - key: gifts_received
+        name: Gifts Received
+      - key: other_income
+        name: Other Income
+
+  - key: money_movement
+    name: Money Movement
+    description: Transfers that move principal between owned accounts or reduce liabilities.
+    transaction_types: [transfer]
+    children:
+      - key: account_transfer
+        name: Account Transfer
+      - key: credit_card_payment
+        name: Credit Card Payment
+      - key: debt_principal
+        name: Debt Principal Payment
+      - key: investment_contribution
+        name: Investment Contribution
+      - key: cash_withdrawal
+        name: Cash Withdrawal
+
+  - key: unclassified
+    name: Unclassified
+    description: Explicit review states for records that cannot yet be classified safely.
+    transaction_types: [expense, refund, income, transfer]
+    children:
+      - key: needs_review
+        name: Needs Review
+        description: Temporary classification requiring review before reliable analytics.
+      - key: user_approved_other
+        name: User-Approved Other
+        description: Intentionally uncategorized after explicit user review.
+
+facets:
+  - key: product_form
+    name: Product Form
+    description: Physical preparation or preservation form.
+    selection_mode: single
+    values:
+      - {key: fresh, name: Fresh}
+      - {key: frozen, name: Frozen}
+      - {key: canned_jarred, name: Canned or Jarred}
+      - {key: dried, name: Dried}
+      - {key: prepared, name: Prepared}
+      - {key: shelf_stable, name: Shelf-Stable}
+  - key: dietary
+    name: Dietary
+    description: Dietary properties or marketed dietary suitability.
+    selection_mode: multiple
+    values:
+      - {key: vegetarian, name: Vegetarian}
+      - {key: vegan, name: Vegan}
+      - {key: gluten_free, name: Gluten-Free}
+      - {key: halal, name: Halal}
+      - {key: kosher, name: Kosher}
+      - {key: lactose_free, name: Lactose-Free}
+      - {key: high_protein, name: High Protein}
+      - {key: whole_food, name: Whole Food}
+  - key: sourcing
+    name: Sourcing
+    description: Product sourcing, production, or certification properties.
+    selection_mode: multiple
+    values:
+      - {key: organic, name: Organic}
+      - {key: local, name: Local}
+      - {key: imported, name: Imported}
+      - {key: fair_trade, name: Fair Trade}
+  - key: ingredient
+    name: Ingredient Theme
+    description: Cross-cutting primary ingredient themes.
+    selection_mode: multiple
+    values:
+      - {key: fruit, name: Fruit}
+      - {key: vegetable, name: Vegetable}
+      - {key: chocolate, name: Chocolate}
+      - {key: produce, name: Produce}
+  - key: sale_format
+    name: Sale Format
+    description: How the product was packaged or sold.
+    selection_mode: multiple
+    values:
+      - {key: weighted, name: Sold by Weight}
+      - {key: bulk, name: Bulk}
+      - {key: multipack, name: Multipack}
+      - {key: single_serve, name: Single Serve}
+  - key: use_context
+    name: Use Context
+    description: Personal, business, or reimbursement context without duplicating categories.
+    selection_mode: single
+    values:
+      - {key: personal, name: Personal}
+      - {key: business, name: Business}
+      - {key: reimbursable, name: Reimbursable}
+  - key: recurrence
+    name: Recurrence
+    description: Whether the expense is one-time or recurring.
+    selection_mode: single
+    values:
+      - {key: one_time, name: One-Time}
+      - {key: recurring, name: Recurring}
+  - key: necessity
+    name: Necessity
+    description: Optional user judgment for budgeting and discretionary-spend analysis.
+    selection_mode: single
+    values:
+      - {key: essential, name: Essential}
+      - {key: discretionary, name: Discretionary}
+      - {key: unclassified, name: Not Classified}
+  - key: audience
+    name: Audience
+    description: Intended household audience or care use.
+    selection_mode: multiple
+    values:
+      - {key: baby, name: Baby}
+      - {key: child, name: Child}
+      - {key: adult, name: Adult}
+      - {key: senior, name: Senior}
+      - {key: pet, name: Pet}
+  - key: use_case
+    name: Use Case
+    description: Cross-cutting use case not suitable as a spending category.
+    selection_mode: multiple
+    values:
+      - {key: household, name: Household}
+      - {key: personal_care, name: Personal Care}
+      - {key: medical, name: Medical}
+      - {key: sports_nutrition, name: Sports Nutrition}
+  - key: deal
+    name: Deal
+    description: Promotion or savings context; monetary effects remain adjustments.
+    selection_mode: multiple
+    values:
+      - {key: sale, name: Sale}
+      - {key: coupon, name: Coupon}
+      - {key: member_price, name: Member Price}
+      - {key: bundle, name: Bundle Offer}
+  - key: fuel_grade
+    name: Fuel Grade
+    description: Motor-fuel grade without fragmenting transportation categories.
+    selection_mode: single
+    values:
+      - {key: regular, name: Regular}
+      - {key: mid_grade, name: Mid-Grade}
+      - {key: premium, name: Premium}
+      - {key: diesel, name: Diesel}
+  - key: medication_access
+    name: Medication Access
+    description: Whether medication requires a prescription.
+    selection_mode: single
+    values:
+      - {key: prescription, name: Prescription}
+      - {key: over_the_counter, name: Over the Counter}
+
+legacy_prefix_mappings:
+  - {source: grocery.food.produce.fruit.apples, target: food_dining.groceries.produce.fruit.apples_pears}
+  - {source: grocery.food.produce.fruit.bananas, target: food_dining.groceries.produce.fruit.bananas_plantains}
+  - {source: grocery.food.produce.fruit.citrus, target: food_dining.groceries.produce.fruit.citrus}
+  - {source: grocery.food.produce.fruit.berries, target: food_dining.groceries.produce.fruit.berries}
+  - {source: grocery.food.produce.fruit.grapes, target: food_dining.groceries.produce.fruit.grapes}
+  - {source: grocery.food.produce.fruit.melons, target: food_dining.groceries.produce.fruit.melons}
+  - {source: grocery.food.produce.fruit.stone_fruit, target: food_dining.groceries.produce.fruit.stone_fruit}
+  - {source: grocery.food.produce.fruit.tropical, target: food_dining.groceries.produce.fruit.tropical}
+  - {source: grocery.food.produce.fruit, target: food_dining.groceries.produce.fruit.mixed_fruit}
+  - {source: grocery.food.produce.vegetables.leafy_greens, target: food_dining.groceries.produce.vegetables.leafy_greens}
+  - {source: grocery.food.produce.vegetables.cruciferous, target: food_dining.groceries.produce.vegetables.cruciferous}
+  - {source: grocery.food.produce.vegetables.root, target: food_dining.groceries.produce.vegetables.roots_tubers}
+  - {source: grocery.food.produce.vegetables.potatoes_sweet_potatoes, target: food_dining.groceries.produce.vegetables.potatoes}
+  - {source: grocery.food.produce.vegetables.tomatoes, target: food_dining.groceries.produce.vegetables.nightshades.tomatoes}
+  - {source: grocery.food.produce.vegetables.alliums, target: food_dining.groceries.produce.vegetables.alliums}
+  - {source: grocery.food.produce.vegetables, target: food_dining.groceries.produce.vegetables.mixed_vegetables}
+  - {source: grocery.food.produce.herbs, target: food_dining.groceries.produce.herbs_aromatics}
+  - {source: grocery.food.produce.mushrooms, target: food_dining.groceries.produce.vegetables.mushrooms}
+  - {source: grocery.food.produce.salad_kits, target: food_dining.groceries.produce.salads_kits}
+  - {source: grocery.food.produce, target: unclassified.needs_review}
+  - {source: grocery.food.dairy_eggs_alternatives.milk, target: food_dining.groceries.dairy_eggs.milk.cows_milk}
+  - {source: grocery.food.dairy_eggs_alternatives.plant_milk, target: food_dining.groceries.dairy_eggs.dairy_alternatives.plant_milk}
+  - {source: grocery.food.dairy_eggs_alternatives.yogurt, target: food_dining.groceries.dairy_eggs.yogurt_fermented.yogurt}
+  - {source: grocery.food.dairy_eggs_alternatives.cheese, target: food_dining.groceries.dairy_eggs.cheese.fresh_soft}
+  - {source: grocery.food.dairy_eggs_alternatives.eggs, target: food_dining.groceries.dairy_eggs.eggs}
+  - {source: grocery.food.dairy_eggs_alternatives, target: unclassified.needs_review}
+  - {source: grocery.food.meat_seafood_alternatives.meat_poultry, target: food_dining.groceries.meat_seafood_alternatives.meat_poultry.deli_prepared_meat}
+  - {source: grocery.food.meat_seafood_alternatives.seafood, target: food_dining.groceries.meat_seafood_alternatives.seafood.prepared_seafood}
+  - {source: grocery.food.meat_seafood_alternatives.plant_based, target: food_dining.groceries.meat_seafood_alternatives.plant_proteins.meat_alternatives}
+  - {source: grocery.food.meat_seafood_alternatives, target: unclassified.needs_review}
+  - {source: grocery.food.bakery.bread_buns, target: food_dining.groceries.bread_bakery.bread}
+  - {source: grocery.food.bakery.cakes_pastries, target: food_dining.groceries.bread_bakery.pastries}
+  - {source: grocery.food.bakery, target: unclassified.needs_review}
+  - {source: grocery.food.grains_rice_pasta.rice, target: food_dining.groceries.grains_pasta.rice.long_grain}
+  - {source: grocery.food.grains_rice_pasta.pasta, target: food_dining.groceries.grains_pasta.pasta}
+  - {source: grocery.food.grains_rice_pasta.noodles, target: food_dining.groceries.grains_pasta.noodles}
+  - {source: grocery.food.grains_rice_pasta.whole_grains, target: food_dining.groceries.grains_pasta.whole_grains}
+  - {source: grocery.food.grains_rice_pasta, target: unclassified.needs_review}
+  - {source: grocery.food.pulses_beans_lentils.lentils, target: food_dining.groceries.pantry_cooking.pulses_legumes.lentils}
+  - {source: grocery.food.pulses_beans_lentils.beans, target: food_dining.groceries.pantry_cooking.pulses_legumes.beans}
+  - {source: grocery.food.pulses_beans_lentils.chickpeas, target: food_dining.groceries.pantry_cooking.pulses_legumes.chickpeas}
+  - {source: grocery.food.pulses_beans_lentils, target: unclassified.needs_review}
+  - {source: grocery.food.flour_baking.flour, target: food_dining.groceries.grains_pasta.flour}
+  - {source: grocery.food.flour_baking.baking_ingredients, target: food_dining.groceries.pantry_cooking.baking_ingredients}
+  - {source: grocery.food.flour_baking, target: unclassified.needs_review}
+  - {source: grocery.food.breakfast.cereal_granola, target: food_dining.groceries.breakfast.cereal_granola}
+  - {source: grocery.food.breakfast.oats_hot_cereal, target: food_dining.groceries.grains_pasta.oats}
+  - {source: grocery.food.breakfast, target: unclassified.needs_review}
+  - {source: grocery.food.pantry_cooking.spices_seasonings, target: food_dining.groceries.pantry_cooking.spices_seasonings}
+  - {source: grocery.food.pantry_cooking.oils_vinegars, target: food_dining.groceries.pantry_cooking.oils_vinegars}
+  - {source: grocery.food.pantry_cooking.canned_jarred, target: food_dining.groceries.pantry_cooking.canned_jarred}
+  - {source: grocery.food.pantry_cooking.cooking_bases, target: food_dining.groceries.pantry_cooking.cooking_bases}
+  - {source: grocery.food.pantry_cooking, target: unclassified.needs_review}
+  - {source: grocery.food.condiments_spreads.sauces_condiments, target: food_dining.groceries.pantry_cooking.sauces_condiments}
+  - {source: grocery.food.condiments_spreads.spreads, target: food_dining.groceries.pantry_cooking.spreads}
+  - {source: grocery.food.condiments_spreads, target: unclassified.needs_review}
+  - {source: grocery.food.snacks.nuts, target: food_dining.groceries.snacks_confectionery.nuts_seeds}
+  - {source: grocery.food.snacks.protein_bars, target: food_dining.groceries.snacks_confectionery.snack_bars}
+  - {source: grocery.food.snacks.indian_snacks, target: food_dining.groceries.snacks_confectionery.savoury_snacks}
+  - {source: grocery.food.snacks.chips_crackers, target: food_dining.groceries.snacks_confectionery.savoury_snacks}
+  - {source: grocery.food.snacks.popcorn, target: food_dining.groceries.snacks_confectionery.popcorn}
+  - {source: grocery.food.snacks.snack_mixes, target: food_dining.groceries.snacks_confectionery.savoury_snacks}
+  - {source: grocery.food.snacks, target: unclassified.needs_review}
+  - {source: grocery.food.sweets_desserts.chocolate, target: food_dining.groceries.snacks_confectionery.chocolate}
+  - {source: grocery.food.sweets_desserts.cookies_biscuits_wafers, target: food_dining.groceries.snacks_confectionery.cookies}
+  - {source: grocery.food.sweets_desserts.candy_confectionery, target: food_dining.groceries.snacks_confectionery.candy}
+  - {source: grocery.food.sweets_desserts.frozen_desserts, target: food_dining.groceries.frozen_food.ice_cream_desserts}
+  - {source: grocery.food.sweets_desserts, target: unclassified.needs_review}
+  - {source: grocery.food.prepared.ready_meals, target: food_dining.groceries.prepared_food.ready_meals}
+  - {source: grocery.food.prepared.deli_prepared, target: food_dining.groceries.prepared_food.deli_food}
+  - {source: grocery.food.prepared, target: unclassified.needs_review}
+  - {source: grocery.food.beverages.water, target: food_dining.groceries.beverages.water}
+  - {source: grocery.food.beverages.soft_drinks, target: food_dining.groceries.beverages.soft_drinks}
+  - {source: grocery.food.beverages.juice, target: food_dining.groceries.beverages.juice}
+  - {source: grocery.food.beverages.coffee_tea, target: food_dining.groceries.beverages.coffee}
+  - {source: grocery.food.beverages.alcoholic, target: food_dining.groceries.beverages.beer}
+  - {source: grocery.food.beverages, target: unclassified.needs_review}
+  - {source: grocery.food.nutrition_sports.protein_supplements, target: food_dining.groceries.nutrition_supplements.protein_supplements}
+  - {source: grocery.food.nutrition_sports.energy_sports_foods, target: food_dining.groceries.nutrition_supplements.sports_foods}
+  - {source: grocery.food.nutrition_sports.meal_replacements, target: food_dining.groceries.nutrition_supplements.meal_replacements}
+  - {source: grocery.food.nutrition_sports, target: unclassified.needs_review}
+  - {source: grocery.food, target: unclassified.needs_review}
+  - {source: grocery.household.cleaning, target: housing_utilities.household_operations.cleaning_supplies}
+  - {source: grocery.household.laundry, target: housing_utilities.household_operations.laundry_supplies}
+  - {source: grocery.household.dishwashing, target: housing_utilities.household_operations.dishwashing_supplies}
+  - {source: grocery.household.paper_disposable, target: housing_utilities.household_operations.paper_disposables}
+  - {source: grocery.household.garbage_storage, target: housing_utilities.household_operations.storage_organization}
+  - {source: grocery.household.maintenance, target: housing_utilities.maintenance_repairs.general_repairs}
+  - {source: grocery.household.pest_control, target: housing_utilities.household_operations.pest_control_products}
+  - {source: grocery.household.air_care, target: housing_utilities.household_operations.air_care}
+  - {source: grocery.household, target: unclassified.needs_review}
+  - {source: grocery.personal_care.bath_body, target: personal_care.products.bath_body}
+  - {source: grocery.personal_care.hair, target: personal_care.products.hair}
+  - {source: grocery.personal_care.oral, target: personal_care.products.oral}
+  - {source: grocery.personal_care.skin, target: personal_care.products.skin}
+  - {source: grocery.personal_care, target: unclassified.needs_review}
+  - {source: grocery.health_products.otc_medicine, target: health_wellness.pharmacy.otc}
+  - {source: grocery.health_products.first_aid, target: health_wellness.pharmacy.first_aid}
+  - {source: grocery.health_products.vitamins_supplements, target: health_wellness.pharmacy.vitamins_supplements}
+  - {source: grocery.health_products, target: unclassified.needs_review}
+  - {source: grocery.baby.food_formula, target: family_dependants_pets.children.baby_food_formula}
+  - {source: grocery.baby.diapers, target: family_dependants_pets.children.diapers_hygiene}
+  - {source: grocery.baby, target: unclassified.needs_review}
+  - {source: grocery.pet.food, target: family_dependants_pets.pets.food}
+  - {source: grocery.pet.treats, target: family_dependants_pets.pets.treats}
+  - {source: grocery.pet, target: unclassified.needs_review}
+  - {source: grocery.home_kitchen.cookware, target: housing_utilities.furnishings_home_goods.kitchenware}
+  - {source: grocery.home_kitchen.kitchen_tools, target: housing_utilities.furnishings_home_goods.kitchenware}
+  - {source: grocery.home_kitchen, target: unclassified.needs_review}
+  - {source: grocery.electronics_office.consumer_electronics, target: shopping_retail.electronics.audio_video}
+  - {source: grocery.electronics_office.stationery, target: shopping_retail.office_supplies}
+  - {source: grocery.electronics_office, target: unclassified.needs_review}
+  - {source: grocery.clothing_accessories.mens, target: shopping_retail.clothing.mens}
+  - {source: grocery.clothing_accessories.womens, target: shopping_retail.clothing.womens}
+  - {source: grocery.clothing_accessories, target: unclassified.needs_review}
+  - {source: grocery.seasonal_general.holiday, target: shopping_retail.seasonal}
+  - {source: grocery.seasonal_general.sports_recreation_goods, target: shopping_retail.sporting_goods}
+  - {source: grocery.seasonal_general, target: shopping_retail.general_merchandise}
+  - {source: grocery, target: unclassified.needs_review}
+  - {source: eating_out.restaurants, target: food_dining.eating_out.restaurants.full_service}
+  - {source: eating_out.fast_food, target: food_dining.eating_out.quick_service}
+  - {source: eating_out.cafes, target: food_dining.eating_out.cafes_bakeries}
+  - {source: eating_out.delivery_takeout, target: food_dining.eating_out.delivery}
+  - {source: eating_out.bars, target: food_dining.eating_out.bars_nightlife}
+  - {source: eating_out, target: unclassified.needs_review}
+  - {source: housing_utilities.rent_mortgage, target: housing_utilities.housing_payments.rent}
+  - {source: housing_utilities.electricity, target: housing_utilities.utilities.electricity}
+  - {source: housing_utilities.gas, target: housing_utilities.utilities.natural_gas}
+  - {source: housing_utilities.water, target: housing_utilities.utilities.water}
+  - {source: housing_utilities.internet_phone, target: housing_utilities.communications.home_internet}
+  - {source: housing_utilities.repairs, target: housing_utilities.maintenance_repairs.general_repairs}
+  - {source: housing_utilities, target: unclassified.needs_review}
+  - {source: transportation.fuel, target: transportation.personal_vehicle.fuel.gasoline}
+  - {source: transportation.public_transit, target: transportation.public_transit.pass}
+  - {source: transportation.rideshare_taxi, target: transportation.taxi_rideshare}
+  - {source: transportation.parking_tolls, target: transportation.personal_vehicle.parking}
+  - {source: transportation.vehicle_maintenance, target: transportation.personal_vehicle.maintenance}
+  - {source: transportation, target: unclassified.needs_review}
+  - {source: travel.flights, target: travel.airfare}
+  - {source: travel.lodging, target: travel.lodging}
+  - {source: travel.car_rental, target: travel.car_rental}
+  - {source: travel.activities, target: travel.tours_activities}
+  - {source: travel, target: unclassified.needs_review}
+  - {source: health.services, target: health_wellness.medical_care.primary_care}
+  - {source: health.fitness, target: health_wellness.fitness.gym}
+  - {source: health.therapy, target: health_wellness.mental_health}
+  - {source: health, target: unclassified.needs_review}
+  - {source: shopping.apparel, target: shopping_retail.clothing.mens}
+  - {source: shopping.electronics, target: shopping_retail.electronics.audio_video}
+  - {source: shopping.furniture, target: housing_utilities.furnishings_home_goods.furniture}
+  - {source: shopping, target: unclassified.needs_review}
+  - {source: entertainment.streaming, target: entertainment_leisure.streaming_media.video}
+  - {source: entertainment.events, target: entertainment_leisure.live_events.concerts}
+  - {source: entertainment.games, target: entertainment_leisure.gaming.games}
+  - {source: entertainment, target: unclassified.needs_review}
+  - {source: education.tuition, target: education.tuition}
+  - {source: education.books, target: education.books_materials}
+  - {source: education, target: unclassified.needs_review}
+  - {source: financial.bank_fees, target: financial_services.banking_fees}
+  - {source: financial.interest, target: financial_services.loan_interest}
+  - {source: financial, target: unclassified.needs_review}
+  - {source: gifts_donations.gifts, target: gifts_giving.personal_gifts}
+  - {source: gifts_donations.donations, target: gifts_giving.charitable_donations}
+  - {source: gifts_donations, target: unclassified.needs_review}
+  - {source: miscellaneous, target: unclassified.needs_review}
+  - {source: uncategorized, target: unclassified.needs_review}
+
+legacy_theme_mappings:
+  - {source: fresh, target: product_form.fresh}
+  - {source: frozen, target: product_form.frozen}
+  - {source: canned, target: product_form.canned_jarred}
+  - {source: dried, target: product_form.dried}
+  - {source: prepared, target: product_form.prepared}
+  - {source: whole_food, target: dietary.whole_food}
+  - {source: organic, target: sourcing.organic}
+  - {source: imported, target: sourcing.imported}
+  - {source: fruit, target: ingredient.fruit}
+  - {source: vegetable, target: ingredient.vegetable}
+  - {source: chocolate, target: ingredient.chocolate}
+  - {source: produce, target: ingredient.produce}
+  - {source: weighted, target: sale_format.weighted}
+  - {source: bulk, target: sale_format.bulk}
+  - {source: high_protein, target: dietary.high_protein}
+  - {source: sports_nutrition, target: use_case.sports_nutrition}
+  - {source: baby, target: audience.baby}
+  - {source: pet, target: audience.pet}
+  - {source: household, target: use_case.household}
+  - {source: personal_care, target: use_case.personal_care}
+  - {source: medical, target: use_case.medical}

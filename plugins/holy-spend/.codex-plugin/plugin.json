@@ -1,0 +1,35 @@
+{
+  "name": "holy-spend",
+  "version": "0.3.1",
+  "description": "Private receipt extraction, expense review, confirmation, history, and analytics workflows.",
+  "author": {
+    "name": "Holy Spend contributors"
+  },
+  "keywords": [
+    "expenses",
+    "receipts",
+    "personal-finance",
+    "analytics",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Holy Spend",
+    "shortDescription": "Private receipt and expense intelligence",
+    "longDescription": "Extract receipt details, review and reconcile editable expense drafts, require explicit confirmation, browse history, and analyze confirmed spending through a self-hosted MCP server.",
+    "developerName": "Holy Spend contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Open my expense tracker so I can enter a purchase.",
+      "Help me extract and review this receipt without confirming it yet.",
+      "Show my confirmed spending by month, separated by currency."
+    ],
+    "brandColor": "#24543D",
+    "screenshots": []
+  }
+}

@@ -1,0 +1,4 @@
+# Shell scripts must stay LF-only regardless of the committing platform's
+# line-ending settings - a CRLF shebang breaks immediately when Linux (e.g.
+# Cloud Shell, or any container build) tries to run it.
+*.sh text eol=lf

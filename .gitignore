@@ -1,0 +1,17 @@
+.env
+*.env.yaml
+.venv/
+__pycache__/
+.pytest_cache/
+.pytest-tmp-*/
+.ruff_cache/
+.mypy_cache/
+.railway/
+*.pyc
+dist/
+build/
+*.egg-info/
+widget/dist/
+widget/node_modules/
+plugins/holy-spend/.app.json
+plugins/holy-spend/.mcp.json
