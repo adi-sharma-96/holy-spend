@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openPrivateUrl } from "../bridge";
 import { Icon } from "../icons";
 import type { NutritionItem } from "../types";
 
@@ -154,10 +155,10 @@ export function NutritionFactsDrawer({
       )}
 
       {sourceLink && (
-        <a className="off-link" href={sourceLink} target="_blank" rel="noreferrer">
+        <button type="button" className="off-link" onClick={() => void openPrivateUrl(sourceLink)}>
           View on {item.source}
           <Icon name="expand" size={11} />
-        </a>
+        </button>
       )}
     </>
   );

@@ -4746,6 +4746,7 @@ label textarea {
   width: 100%;
   margin-top: 16px;
   padding: 10px;
+  background: transparent;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   color: var(--text-soft);

@@ -1,7 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { NutritionFactsDrawer } from "./NutritionFactsDrawer";
+import { openPrivateUrl } from "../bridge";
 import type { NutritionItem } from "../types";
+
+vi.mock("../bridge", () => ({
+  openPrivateUrl: vi.fn(),
+}));
 
 const item: NutritionItem = {
   transaction_item_id: "d1111111-1111-4111-8111-111111111111",
@@ -110,20 +115,21 @@ describe("NutritionFactsDrawer", () => {
     expect(screen.queryByText("as reported")).not.toBeInTheDocument();
   });
 
-  it("shows a source link only when source_ref is a real URL", () => {
+  it("shows a source link only when source_ref is a real URL, opened via the host bridge", () => {
     render(<NutritionFactsDrawer embedded item={item} onClose={vi.fn()} />);
-    const link = screen.getByRole("link", { name: /view on open food facts/i });
-    expect(link).toHaveAttribute("href", item.source_ref);
+    const link = screen.getByRole("button", { name: /view on open food facts/i });
+    fireEvent.click(link);
+    expect(openPrivateUrl).toHaveBeenCalledWith(item.source_ref);
   });
 
   it("omits the source link when source_ref is missing", () => {
     render(<NutritionFactsDrawer embedded item={{ ...item, source_ref: null }} onClose={vi.fn()} />);
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /view on/i })).not.toBeInTheDocument();
   });
 
   it("omits the source link when source_ref isn't a usable URL", () => {
     render(<NutritionFactsDrawer embedded item={{ ...item, source_ref: "UPC-041631000027" }} onClose={vi.fn()} />);
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /view on/i })).not.toBeInTheDocument();
   });
 
   it("renders as a backdrop modal and closes on backdrop click, not content click", () => {
