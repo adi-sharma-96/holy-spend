@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
-# Pushes the current state of main to the public OSS repo, minus the
-# paths in EXCLUDE, with README.oss.md standing in for README.md.
+# Pushes the current state of main to the public OSS repo (source, minus
+# the paths in EXCLUDE, with README.oss.md standing in for README.md) and
+# refreshes the live GitHub Pages site from docs/site in the same run.
+#
+# Deliberately does NOT merge main into either target branch - a merge
+# carries main's full ancestry along with it, which is exactly what the
+# public repo must never have. Instead each sync replaces each branch's
+# tree wholesale and makes one new, ordinary commit on top of that
+# branch's own history.
 #
 # Usage: scripts/sync-public-repo.sh
 # Requires a git remote named "public-remote" pointing at the OSS repo.
@@ -13,32 +20,53 @@ EXCLUDE=(
   "railway.json"
   "railway.mcp.json"
   "railway.tunnel.json"
+  "CLAUDE.md"
+  "AGENTS.md"
+  ".cursor"
 )
 
-if git show-ref --verify --quiet refs/heads/public; then
-  git checkout public
-  git merge main --no-commit --no-ff -m "Sync from main" || true
+if ! git show-ref --verify --quiet refs/heads/public; then
+  git checkout --orphan public
+  git reset --hard
 else
-  git checkout -b public main
+  git checkout public
 fi
 
-# Resolve modify/delete conflicts on paths we intentionally keep stripped,
-# and re-strip them in case main touched them again since the last sync.
-for f in "${EXCLUDE[@]}" "README.oss.md"; do
-  git rm -rf --ignore-unmatch --quiet -- "$f" 2>/dev/null || true
+# Replace the tree wholesale with main's current tree.
+git rm -rf --quiet -- . >/dev/null 2>&1 || true
+git checkout main -- .
+
+for f in "${EXCLUDE[@]}"; do
+  git rm -rf --ignore-unmatch --quiet -- "$f"
 done
 
-if git diff --name-only --diff-filter=U 2>/dev/null | grep -q .; then
-  echo "Unresolved merge conflicts outside the known-excluded list:"
-  git diff --name-only --diff-filter=U
-  exit 1
-fi
-
 git show main:README.oss.md > README.md
-git add README.md
+git add -A
 git commit --quiet -m "Sync from main" --allow-empty
 
 git push public-remote public:main
 
 git checkout main
-echo "Synced and pushed to public repo."
+
+# --- Refresh the live Pages site (public repo's gh-pages branch) ---
+if ! git show-ref --verify --quiet refs/heads/gh-pages; then
+  git checkout --orphan gh-pages
+  git reset --hard
+else
+  git checkout gh-pages
+fi
+
+git rm -rf --quiet -- . >/dev/null 2>&1 || true
+git checkout main -- docs/site
+shopt -s dotglob
+mv docs/site/* .
+rm -rf docs
+shopt -u dotglob
+
+git add -A
+git commit --quiet -m "Sync from main" --allow-empty
+
+git push public-remote gh-pages:gh-pages
+
+git checkout main
+echo "Synced source and Pages site to the public repo."
