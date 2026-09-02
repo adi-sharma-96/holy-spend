@@ -323,20 +323,32 @@
   }
 
   /* ---------- the receipt itself: closing summary ---------- */
-  .receipt-block { padding: 56px 0 64px; }
+  .receipt-block { padding: 64px 0 72px; }
   .receipt {
-    max-width: 420px;
+    position: relative;
+    max-width: 400px;
     margin: 0 auto;
     background: var(--receipt);
     color: var(--receipt-ink);
     font-family: var(--font-mono);
     font-size: 13.5px;
-    padding: 34px 30px 30px;
-    border-radius: 2px;
+    padding: 28px 28px 22px;
     box-shadow: 0 40px 80px -30px rgba(0,0,0,0.8);
     transform: rotate(-0.6deg);
   }
-  .receipt .r-head { text-align: center; margin-bottom: 18px; }
+  .receipt::before, .receipt::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 11px;
+    background:
+      linear-gradient(-45deg, var(--bg) 5.5px, transparent 0) 0 5.5px / 11px 11px repeat-x,
+      linear-gradient(45deg, var(--bg) 5.5px, transparent 0) 0 5.5px / 11px 11px repeat-x;
+  }
+  .receipt::before { top: -10px; }
+  .receipt::after { bottom: -10px; transform: scaleY(-1); }
+  .receipt .r-head { text-align: center; margin-bottom: 16px; }
   .receipt .r-head .r-name {
     font-family: var(--font-display);
     font-weight: 650;
@@ -344,12 +356,39 @@
     letter-spacing: 0.01em;
   }
   .receipt .r-head .r-sub { color: #6b6f63; margin-top: 4px; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; }
-  .receipt .r-rule { border: none; border-top: 1px dashed #b8b6a8; margin: 14px 0; }
-  .receipt .r-row { display: flex; justify-content: space-between; padding: 5px 0; gap: 16px; }
-  .receipt .r-row span:first-child { color: #3a3d34; }
-  .receipt .r-row span:last-child { font-weight: 600; }
-  .receipt .r-total { display: flex; justify-content: space-between; padding-top: 10px; font-size: 15px; font-weight: 700; }
-  .receipt .r-foot { text-align: center; margin-top: 20px; color: #6b6f63; font-size: 11px; letter-spacing: 0.03em; }
+  .receipt .r-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: #6b6f63;
+    padding: 10px 0;
+  }
+  .receipt .r-rule { border: none; border-top: 1px dashed #b8b6a8; margin: 0; }
+  .receipt .r-row { display: flex; align-items: baseline; gap: 6px; padding: 6px 0; }
+  .receipt .r-row span:first-child { color: #3a3d34; white-space: nowrap; }
+  .receipt .r-row span:last-child { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .receipt .r-dots {
+    flex: 1;
+    border-bottom: 1.5px dotted #a9ad9c;
+    transform: translateY(-3px);
+  }
+  .receipt .r-total { display: flex; justify-content: space-between; padding-top: 12px; font-size: 15px; font-weight: 700; }
+  .receipt .r-barcode {
+    height: 32px;
+    margin: 18px 2px 4px;
+    background-image: repeating-linear-gradient(90deg,
+      var(--receipt-ink) 0 1px, transparent 1px 3px,
+      var(--receipt-ink) 3px 5px, transparent 5px 6px,
+      var(--receipt-ink) 6px 6.5px, transparent 6.5px 9px,
+      var(--receipt-ink) 9px 11px, transparent 11px 12px,
+      var(--receipt-ink) 12px 12.5px, transparent 12.5px 15px
+    );
+    background-repeat: repeat-x;
+    opacity: 0.85;
+  }
+  .receipt .r-barcode-num { text-align: center; font-size: 10px; letter-spacing: 0.15em; color: #6b6f63; }
+  .receipt .r-foot { text-align: center; margin-top: 16px; color: #6b6f63; font-size: 11px; letter-spacing: 0.03em; }
 
   .receipt-cta { text-align: center; margin-top: 40px; }
   .receipt-cta p { color: var(--ink-dim); margin: 0 0 18px; }
@@ -559,12 +598,16 @@
       <div class="r-sub">Self-hosted &middot; single user</div>
     </div>
     <hr class="r-rule">
-    <div class="r-row"><span>Monthly hosting cost</span><span>$0.00</span></div>
-    <div class="r-row"><span>Data leaving your database</span><span>$0.00</span></div>
-    <div class="r-row"><span>New app to open</span><span>$0.00</span></div>
-    <div class="r-row"><span>License</span><span>MIT</span></div>
+    <div class="r-meta"><span>TXN #0001</span><span>REG: LOCALHOST</span></div>
+    <hr class="r-rule">
+    <div class="r-row"><span>Monthly hosting cost</span><span class="r-dots"></span><span>$0.00</span></div>
+    <div class="r-row"><span>Data leaving your database</span><span class="r-dots"></span><span>$0.00</span></div>
+    <div class="r-row"><span>New app to open</span><span class="r-dots"></span><span>$0.00</span></div>
+    <div class="r-row"><span>License</span><span class="r-dots"></span><span>MIT</span></div>
     <hr class="r-rule">
     <div class="r-total"><span>Total</span><span>Yours to run</span></div>
+    <div class="r-barcode"></div>
+    <div class="r-barcode-num">HOLY-SPEND-MIT-0001</div>
     <div class="r-foot">THANK YOU &middot; KEEP THIS RECEIPT</div>
   </div>
   <div class="receipt-cta">
