@@ -24,6 +24,9 @@ ITEM_GROUPINGS = {
     AnalyticsGrouping.THEME,
     AnalyticsGrouping.FACET,
 }
+ADJUSTMENT_GROUPINGS = {
+    AnalyticsGrouping.ADJUSTMENT_SUBTYPE,
+}
 
 
 TRANSACTION_METRICS = {
@@ -114,6 +117,48 @@ ITEM_LEVEL_METRICS = {
 }
 
 
+# One transaction can carry several adjustment rows (a delivery order's fee,
+# service fee, and tip are three separate rows, not one blended "fee"
+# number) - grouping by adjustment_subtype needs its own metric set computed
+# from transaction_adjustments directly, the same way item-level grouping
+# needs its own set computed from transaction_items rather than reusing the
+# whole-transaction columns.
+ADJUSTMENT_LEVEL_METRICS = {
+    AnalyticsMetric.TOTAL_SPEND: """
+        coalesce(sum(case
+            when t.transaction_type = 'expense' then adj.amount
+            when t.transaction_type = 'refund' then -abs(adj.amount)
+            else 0
+        end), 0)
+    """,
+    AnalyticsMetric.PURCHASE_COUNT: "count(distinct t.id) filter (where t.transaction_type = 'expense')",
+    AnalyticsMetric.QUANTITY_PURCHASED: "0",
+    AnalyticsMetric.AVERAGE_ITEM_PRICE: "coalesce(avg(abs(adj.amount)), 0)",
+    AnalyticsMetric.DISCOUNT_TOTAL: """
+        coalesce(sum(case
+            when t.transaction_type = 'expense' then adj.amount
+            when t.transaction_type = 'refund' then -abs(adj.amount)
+            else 0
+        end) filter (where adj.type in ('coupon', 'discount')), 0)
+    """,
+    AnalyticsMetric.TAX_TOTAL: """
+        coalesce(sum(case
+            when t.transaction_type = 'expense' then adj.amount
+            when t.transaction_type = 'refund' then -abs(adj.amount)
+            else 0
+        end) filter (where adj.type = 'tax'), 0)
+    """,
+    AnalyticsMetric.FEE_TOTAL: """
+        coalesce(sum(case
+            when t.transaction_type = 'expense' then adj.amount
+            when t.transaction_type = 'refund' then -abs(adj.amount)
+            else 0
+        end) filter (where adj.type = 'fee'), 0)
+    """,
+    AnalyticsMetric.REFUND_TOTAL: "0",
+}
+
+
 DIMENSIONS = {
     AnalyticsGrouping.DAY: "t.transaction_date",
     AnalyticsGrouping.WEEK: "date_trunc('week', t.transaction_date)::date",
@@ -128,6 +173,11 @@ DIMENSIONS = {
     AnalyticsGrouping.PURCHASE_CHANNEL: "t.purchase_channel::text",
     AnalyticsGrouping.PROVIDER: "coalesce(t.provider_key, 'none')",
     AnalyticsGrouping.CURRENCY: "t.currency",
+    # Tax/tip/deposit/rounding never carry a subtype (only fee and
+    # coupon/discount do), so falling back to the adjustment's own type
+    # keeps every row groupable instead of collapsing them into one
+    # unlabeled bucket.
+    AnalyticsGrouping.ADJUSTMENT_SUBTYPE: "coalesce(adj.subtype, adj.type::text)",
 }
 
 
@@ -166,11 +216,28 @@ class AnalyticsQueryCompiler:
             or filters.theme_slug
             or filters.facet_value_key
         )
-        metrics = ITEM_LEVEL_METRICS if uses_items else TRANSACTION_METRICS
+        uses_adjustments = bool(set(group_by) & ADJUSTMENT_GROUPINGS or filters.adjustment_subtype)
+        if uses_adjustments and uses_items:
+            raise ValueError(
+                "adjustment_subtype cannot be combined with an item-level grouping or filter "
+                "(category, concept, variant, theme, facet) - each adjustment row isn't tied to "
+                "a single item the way a category or concept is, so joining both at once would "
+                "double-count rows rather than answer either question correctly."
+            )
+        if uses_adjustments:
+            metrics = ADJUSTMENT_LEVEL_METRICS
+        elif uses_items:
+            metrics = ITEM_LEVEL_METRICS
+        else:
+            metrics = TRANSACTION_METRICS
 
         joins: list[str] = []
         if uses_items:
             joins.append("join transaction_items i on i.transaction_id = t.id and i.user_id = t.user_id")
+        if uses_adjustments:
+            joins.append(
+                "join transaction_adjustments adj on adj.transaction_id = t.id and adj.user_id = t.user_id"
+            )
         if (
             AnalyticsGrouping.CATEGORY in group_by
             or filters.category_slug
@@ -312,6 +379,9 @@ class AnalyticsQueryCompiler:
         if filters.currency is not None:
             params["currency"] = filters.currency
             conditions.append("t.currency = %(currency)s")
+        if filters.adjustment_subtype is not None:
+            params["adjustment_subtype"] = filters.adjustment_subtype.value
+            conditions.append("adj.subtype = %(adjustment_subtype)s")
 
         group_expressions = [dimensions[grouping] for grouping in group_by]
         group_clause = f"group by {', '.join(group_expressions)}" if group_expressions else ""

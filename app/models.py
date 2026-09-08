@@ -134,6 +134,7 @@ class AnalyticsGrouping(StrEnum):
     PURCHASE_CHANNEL = "purchase_channel"
     PROVIDER = "provider"
     CURRENCY = "currency"
+    ADJUSTMENT_SUBTYPE = "adjustment_subtype"
 
 
 class ReceiptFileUploadStatus(StrEnum):
@@ -710,6 +711,7 @@ class AnalyticsFilters(BaseModel):
     provider_key: str | None = Field(default=None, min_length=1, max_length=100)
     transaction_type: TransactionType | None = None
     currency: str | None = None
+    adjustment_subtype: AdjustmentSubtype | None = None
 
     @field_validator("currency")
     @classmethod
