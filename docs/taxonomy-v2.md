@@ -158,6 +158,48 @@ database URL. The running service must continue using the restricted
 
 ## Evolution rules
 
+### Purchase-driven review
+
+Review recent purchases across the entire taxonomy, including newly imported older
+receipts when ingestion timestamps are available. Inspect the actual item records
+and comparison endpoints rather than relying on an agent's narrative summary.
+Look for catch-all usage, different product types sharing a comparison bucket,
+stale aliases, uncertain measurements, and repeated clarification requests.
+
+A reporting category is not automatically a comparable product. Separate
+materially different types (for example Greek yogurt, regular yogurt, dahi and
+skyr), while keeping brand, SKU, package size and merchant as product attributes.
+Use existing leaves before adding new ones. Never infer product type from price,
+brand alone, or the absence of a distinguishing word. Broad/unspecified buckets
+must remain excluded from Deals until there is evidence of comparability.
+
+The broad Peppers and Frozen Produce leaves are also excluded from Deals: hot
+chillies and bell peppers are different products, and freezing does not make
+fruit, vegetables and coconut comparable. This is a conservative suppression
+until reviewed taxonomy splits and historical mappings exist. It changes neither
+spending reports nor exact-product history and requires no additional migration.
+
+Each proposal should include purchase evidence, affected groups, a local patch,
+generated artifacts, an additive migration, comparison regression tests and a
+review of ambiguous historical mappings. Validate the patch before requesting
+deployment approval. Do not apply proposed classifications to live records as
+part of the review. Avoid duplicate proposals while an earlier patch awaits a
+decision. Purchase-specific evidence belongs in private reports, excluded from
+the public mirror.
+
+Migrations `0030_specific_fruit_and_yogurt.sql` and
+`0031_backfill_specific_fruit_and_yogurt.sql` add named tropical fruit and distinct
+yogurt types without removing the existing broad fallback keys. The second
+migration reclassifies only unambiguous raw receipt descriptions on unreviewed,
+suggested classifications, marks the results as suggested, and preserves all
+financial values. User-authored, reviewed, and needs-review classifications are
+preserved. Interpreted or normalized names alone are never backfill evidence. Unresolved records remain in
+excluded broad categories. Existing aliases and product concepts are not rewritten
+from individual examples; the uploading agent must resolve their classification
+against the current taxonomy. Apply both migrations before deploying this change.
+
+### Compatibility
+
 - Never change the meaning of a published stable key.
 - Rename display text without changing the key when semantics are unchanged.
 - Add new leaves only when they create a useful reporting distinction.

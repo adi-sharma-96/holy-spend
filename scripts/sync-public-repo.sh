@@ -30,6 +30,8 @@ PARENT_DIR="$(dirname "$REPO_ROOT")"
 
 EXCLUDE=(
   "docs/marketplace-roadmap.md"
+  "docs/robustness-roadmap.md"
+  "docs/implementation"
   "docs/railway-deployment.md"
   "railway.json"
   "railway.mcp.json"

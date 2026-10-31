@@ -37,9 +37,9 @@ jobs:
         working-directory: widget
         run: npm ci
 
-      - name: Widget production audit
+      - name: Widget dependency audit
         working-directory: widget
-        run: npm audit --omit=dev
+        run: npm audit
 
       - name: Widget tests
         working-directory: widget

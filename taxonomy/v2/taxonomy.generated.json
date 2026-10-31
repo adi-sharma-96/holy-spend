@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
   "version_id": "c39450a8-ead7-53d3-821f-956df5f5eba5",
-  "content_hash": "11a06b132fc9b3df31eac202c82091e2e4651dcc830ac9fb89a29f38a4dca210",
+  "content_hash": "6c2d94d7ab89a9639939ad366d4ca10b0662b5bf16f1efaf4660d70883f62c05",
   "levels": [
     "Domain",
     "Group",
@@ -3270,13 +3270,455 @@
       "metadata": {}
     },
     {
+      "id": "38d64a6a-cb47-5dff-8871-efd56714b10c",
+      "stable_key": "food_dining.groceries.produce.fruit.tropical.kiwis",
+      "parent_key": "food_dining.groceries.produce.fruit.tropical",
+      "name": "Kiwis",
+      "description": "Kiwis",
+      "level": 6,
+      "sort_order": 70,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8e65732a-309e-56bb-9b02-21234af46dad",
+          "stable_key": "food_dining.groceries.produce",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Produce"
+        },
+        {
+          "id": "181372c5-b366-5c20-a97d-737e31ae7452",
+          "stable_key": "food_dining.groceries.produce.fruit",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Fruit"
+        },
+        {
+          "id": "726804fa-8774-545e-8281-e31dc1ac4bff",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Tropical Fruit"
+        },
+        {
+          "id": "38d64a6a-cb47-5dff-8871-efd56714b10c",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical.kiwis",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Kiwis"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.produce",
+          "name": "Produce"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit",
+          "name": "Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical",
+          "name": "Tropical Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical.kiwis",
+          "name": "Kiwis"
+        }
+      ],
+      "synonyms": [
+        "kiwi",
+        "kiwifruit",
+        "kiwi fruit"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "43e2e5cf-25e3-5f2d-8932-0597853c9d81",
+      "stable_key": "food_dining.groceries.produce.fruit.tropical.lychees",
+      "parent_key": "food_dining.groceries.produce.fruit.tropical",
+      "name": "Lychees",
+      "description": "Lychees",
+      "level": 6,
+      "sort_order": 80,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8e65732a-309e-56bb-9b02-21234af46dad",
+          "stable_key": "food_dining.groceries.produce",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Produce"
+        },
+        {
+          "id": "181372c5-b366-5c20-a97d-737e31ae7452",
+          "stable_key": "food_dining.groceries.produce.fruit",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Fruit"
+        },
+        {
+          "id": "726804fa-8774-545e-8281-e31dc1ac4bff",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Tropical Fruit"
+        },
+        {
+          "id": "43e2e5cf-25e3-5f2d-8932-0597853c9d81",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical.lychees",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Lychees"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.produce",
+          "name": "Produce"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit",
+          "name": "Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical",
+          "name": "Tropical Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical.lychees",
+          "name": "Lychees"
+        }
+      ],
+      "synonyms": [
+        "lychee",
+        "litchi"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "c0406763-ad0e-574a-937e-49a850b8c1c5",
+      "stable_key": "food_dining.groceries.produce.fruit.tropical.rambutans",
+      "parent_key": "food_dining.groceries.produce.fruit.tropical",
+      "name": "Rambutans",
+      "description": "Rambutans",
+      "level": 6,
+      "sort_order": 90,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8e65732a-309e-56bb-9b02-21234af46dad",
+          "stable_key": "food_dining.groceries.produce",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Produce"
+        },
+        {
+          "id": "181372c5-b366-5c20-a97d-737e31ae7452",
+          "stable_key": "food_dining.groceries.produce.fruit",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Fruit"
+        },
+        {
+          "id": "726804fa-8774-545e-8281-e31dc1ac4bff",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Tropical Fruit"
+        },
+        {
+          "id": "c0406763-ad0e-574a-937e-49a850b8c1c5",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical.rambutans",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Rambutans"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.produce",
+          "name": "Produce"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit",
+          "name": "Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical",
+          "name": "Tropical Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical.rambutans",
+          "name": "Rambutans"
+        }
+      ],
+      "synonyms": [
+        "rambutan"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "3c69bc00-841c-5f27-bf0d-d4357f5c46fb",
+      "stable_key": "food_dining.groceries.produce.fruit.tropical.dragon_fruit",
+      "parent_key": "food_dining.groceries.produce.fruit.tropical",
+      "name": "Dragon Fruit",
+      "description": "Dragon Fruit",
+      "level": 6,
+      "sort_order": 100,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8e65732a-309e-56bb-9b02-21234af46dad",
+          "stable_key": "food_dining.groceries.produce",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Produce"
+        },
+        {
+          "id": "181372c5-b366-5c20-a97d-737e31ae7452",
+          "stable_key": "food_dining.groceries.produce.fruit",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Fruit"
+        },
+        {
+          "id": "726804fa-8774-545e-8281-e31dc1ac4bff",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Tropical Fruit"
+        },
+        {
+          "id": "3c69bc00-841c-5f27-bf0d-d4357f5c46fb",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical.dragon_fruit",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Dragon Fruit"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.produce",
+          "name": "Produce"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit",
+          "name": "Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical",
+          "name": "Tropical Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical.dragon_fruit",
+          "name": "Dragon Fruit"
+        }
+      ],
+      "synonyms": [
+        "pitaya",
+        "pitahaya"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "7829ed9b-08d1-5a73-bdae-24e72c26f814",
+      "stable_key": "food_dining.groceries.produce.fruit.tropical.passion_fruit",
+      "parent_key": "food_dining.groceries.produce.fruit.tropical",
+      "name": "Passion Fruit",
+      "description": "Passion Fruit",
+      "level": 6,
+      "sort_order": 110,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8e65732a-309e-56bb-9b02-21234af46dad",
+          "stable_key": "food_dining.groceries.produce",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Produce"
+        },
+        {
+          "id": "181372c5-b366-5c20-a97d-737e31ae7452",
+          "stable_key": "food_dining.groceries.produce.fruit",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Fruit"
+        },
+        {
+          "id": "726804fa-8774-545e-8281-e31dc1ac4bff",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Tropical Fruit"
+        },
+        {
+          "id": "7829ed9b-08d1-5a73-bdae-24e72c26f814",
+          "stable_key": "food_dining.groceries.produce.fruit.tropical.passion_fruit",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Passion Fruit"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.produce",
+          "name": "Produce"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit",
+          "name": "Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical",
+          "name": "Tropical Fruit"
+        },
+        {
+          "key": "food_dining.groceries.produce.fruit.tropical.passion_fruit",
+          "name": "Passion Fruit"
+        }
+      ],
+      "synonyms": [],
+      "metadata": {}
+    },
+    {
       "id": "a6f7865e-d90d-5565-a0b9-0178aad2da0d",
       "stable_key": "food_dining.groceries.produce.fruit.tropical.tropical_other",
       "parent_key": "food_dining.groceries.produce.fruit.tropical",
       "name": "Other Tropical Fruit",
-      "description": "Other Tropical Fruit",
+      "description": "Unspecified or other tropical fruit; not a comparable product. Prefer a named fruit leaf whenever identifiable.",
       "level": 6,
-      "sort_order": 70,
+      "sort_order": 120,
       "is_assignable": true,
       "allowed_transaction_types": [
         "expense",
@@ -3352,13 +3794,7 @@
           "name": "Other Tropical Fruit"
         }
       ],
-      "synonyms": [
-        "litchi",
-        "lychee",
-        "rambutan",
-        "dragon fruit",
-        "passion fruit"
-      ],
+      "synonyms": [],
       "metadata": {}
     },
     {
@@ -8451,7 +8887,7 @@
       "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.yogurt",
       "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
       "name": "Yogurt",
-      "description": "Yogurt",
+      "description": "Yogurt whose type is unspecified. Not eligible for price comparisons; use a specific yogurt type when supported by the product evidence.",
       "level": 5,
       "sort_order": 10,
       "is_assignable": true,
@@ -8520,9 +8956,763 @@
         null
       ],
       "synonyms": [
-        "greek yogurt",
-        "plain yogurt",
-        "flavoured yogurt"
+        "yogurt",
+        "yoghurt"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "55ea2ddc-8ab1-5207-b443-62248bc54409",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+      "name": "Greek Yogurt",
+      "description": "Greek Yogurt",
+      "level": 5,
+      "sort_order": 20,
+      "is_assignable": false,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "55ea2ddc-8ab1-5207-b443-62248bc54409",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Greek Yogurt"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "name": "Greek Yogurt"
+        },
+        null
+      ],
+      "synonyms": [],
+      "metadata": {}
+    },
+    {
+      "id": "81f1fdcc-c680-5161-84bf-c056f82887ed",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.plain",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+      "name": "Plain Greek Yogurt",
+      "description": "Plain Greek Yogurt",
+      "level": 6,
+      "sort_order": 10,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "55ea2ddc-8ab1-5207-b443-62248bc54409",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Greek Yogurt"
+        },
+        {
+          "id": "81f1fdcc-c680-5161-84bf-c056f82887ed",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.plain",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Plain Greek Yogurt"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "name": "Greek Yogurt"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.plain",
+          "name": "Plain Greek Yogurt"
+        }
+      ],
+      "synonyms": [
+        "plain greek yogurt",
+        "plain greek yoghurt"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "ac9b7844-b0bd-579a-ae22-b0950d3d6c45",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.flavoured",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+      "name": "Flavoured Greek Yogurt",
+      "description": "Flavoured Greek Yogurt",
+      "level": 6,
+      "sort_order": 20,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "55ea2ddc-8ab1-5207-b443-62248bc54409",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Greek Yogurt"
+        },
+        {
+          "id": "ac9b7844-b0bd-579a-ae22-b0950d3d6c45",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.flavoured",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Flavoured Greek Yogurt"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "name": "Greek Yogurt"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.flavoured",
+          "name": "Flavoured Greek Yogurt"
+        }
+      ],
+      "synonyms": [
+        "flavoured greek yogurt",
+        "flavored greek yogurt",
+        "strawberry greek yogurt",
+        "vanilla greek yogurt"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "79543445-cd54-5706-832d-4c7cefa5cc25",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.unspecified",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+      "name": "Greek Yogurt (Unspecified Flavour)",
+      "description": "Greek yogurt with unknown plain or flavoured status; excluded from price comparisons.",
+      "level": 6,
+      "sort_order": 30,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "55ea2ddc-8ab1-5207-b443-62248bc54409",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Greek Yogurt"
+        },
+        {
+          "id": "79543445-cd54-5706-832d-4c7cefa5cc25",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.unspecified",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Greek Yogurt (Unspecified Flavour)"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt",
+          "name": "Greek Yogurt"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.greek_yogurt.unspecified",
+          "name": "Greek Yogurt (Unspecified Flavour)"
+        }
+      ],
+      "synonyms": [],
+      "metadata": {}
+    },
+    {
+      "id": "b25bfbf9-ab5e-5ae0-b2ba-e369b3e32054",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+      "name": "Regular Yogurt",
+      "description": "Regular Yogurt",
+      "level": 5,
+      "sort_order": 30,
+      "is_assignable": false,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "b25bfbf9-ab5e-5ae0-b2ba-e369b3e32054",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Regular Yogurt"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+          "name": "Regular Yogurt"
+        },
+        null
+      ],
+      "synonyms": [],
+      "metadata": {}
+    },
+    {
+      "id": "fa27d51c-11e0-5b24-ad3c-1f52995a07b7",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt.plain",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+      "name": "Plain Regular Yogurt",
+      "description": "Explicitly identified plain regular yogurt, not Greek yogurt, dahi, or skyr.",
+      "level": 6,
+      "sort_order": 10,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "b25bfbf9-ab5e-5ae0-b2ba-e369b3e32054",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Regular Yogurt"
+        },
+        {
+          "id": "fa27d51c-11e0-5b24-ad3c-1f52995a07b7",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt.plain",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Plain Regular Yogurt"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+          "name": "Regular Yogurt"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt.plain",
+          "name": "Plain Regular Yogurt"
+        }
+      ],
+      "synonyms": [
+        "plain regular yogurt",
+        "plain regular yoghurt"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "0e468873-12cb-5ee0-89ec-0919713007cb",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt.flavoured",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+      "name": "Flavoured Regular Yogurt",
+      "description": "Explicitly identified flavoured regular yogurt, not Greek yogurt or skyr.",
+      "level": 6,
+      "sort_order": 20,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "b25bfbf9-ab5e-5ae0-b2ba-e369b3e32054",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Regular Yogurt"
+        },
+        {
+          "id": "0e468873-12cb-5ee0-89ec-0919713007cb",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt.flavoured",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Flavoured Regular Yogurt"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt",
+          "name": "Regular Yogurt"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.regular_yogurt.flavoured",
+          "name": "Flavoured Regular Yogurt"
+        }
+      ],
+      "synonyms": [
+        "flavoured regular yogurt",
+        "flavored regular yogurt"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "bb573147-5a56-50cd-9ede-b5558104c026",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.dahi",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+      "name": "Dahi",
+      "description": "Cultured dahi, distinct from Greek and other yogurt products.",
+      "level": 5,
+      "sort_order": 40,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "bb573147-5a56-50cd-9ede-b5558104c026",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.dahi",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Dahi"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.dahi",
+          "name": "Dahi"
+        },
+        null
+      ],
+      "synonyms": [
+        "dahi",
+        "indian yogurt",
+        "indian yoghurt"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "04c40e82-b0a6-53c7-a306-62d04e6016e0",
+      "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.skyr",
+      "parent_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+      "name": "Skyr",
+      "description": "Skyr",
+      "level": 5,
+      "sort_order": 50,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "9e1ec481-a5e2-5fd5-9b7d-31aa46380dd7",
+          "stable_key": "food_dining.groceries.dairy_eggs",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "id": "37241e0b-36c6-5f4f-aeef-b55cff111416",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "id": "04c40e82-b0a6-53c7-a306-62d04e6016e0",
+          "stable_key": "food_dining.groceries.dairy_eggs.yogurt_fermented.skyr",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Skyr"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs",
+          "name": "Dairy & Eggs"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented",
+          "name": "Yogurt & Fermented Dairy"
+        },
+        {
+          "key": "food_dining.groceries.dairy_eggs.yogurt_fermented.skyr",
+          "name": "Skyr"
+        },
+        null
+      ],
+      "synonyms": [
+        "skyr",
+        "icelandic yogurt"
       ],
       "metadata": {}
     },
@@ -8533,7 +9723,7 @@
       "name": "Fermented Dairy Drinks",
       "description": "Fermented Dairy Drinks",
       "level": 5,
-      "sort_order": 20,
+      "sort_order": 60,
       "is_assignable": true,
       "allowed_transaction_types": [
         "expense",

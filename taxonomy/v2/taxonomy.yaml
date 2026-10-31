@@ -109,9 +109,23 @@ nodes:
                         name: Guavas
                       - key: avocados
                         name: Avocados
+                      - key: kiwis
+                        name: Kiwis
+                        synonyms: [kiwi, kiwifruit, kiwi fruit]
+                      - key: lychees
+                        name: Lychees
+                        synonyms: [lychee, litchi]
+                      - key: rambutans
+                        name: Rambutans
+                        synonyms: [rambutan]
+                      - key: dragon_fruit
+                        name: Dragon Fruit
+                        synonyms: [pitaya, pitahaya]
+                      - key: passion_fruit
+                        name: Passion Fruit
                       - key: tropical_other
                         name: Other Tropical Fruit
-                        synonyms: [litchi, lychee, rambutan, dragon fruit, passion fruit]
+                        description: Unspecified or other tropical fruit; not a comparable product. Prefer a named fruit leaf whenever identifiable.
                   - key: dried_fruit
                     name: Dried Fruit
                     synonyms: [raisins, dates, prunes, dried apricots]
@@ -276,7 +290,38 @@ nodes:
                 children:
                   - key: yogurt
                     name: Yogurt
-                    synonyms: [greek yogurt, plain yogurt, flavoured yogurt]
+                    description: Yogurt whose type is unspecified. Not eligible for price comparisons; use a specific yogurt type when supported by the product evidence.
+                    synonyms: [yogurt, yoghurt]
+                  - key: greek_yogurt
+                    name: Greek Yogurt
+                    children:
+                      - key: plain
+                        name: Plain Greek Yogurt
+                        synonyms: [plain greek yogurt, plain greek yoghurt]
+                      - key: flavoured
+                        name: Flavoured Greek Yogurt
+                        synonyms: [flavoured greek yogurt, flavored greek yogurt, strawberry greek yogurt, vanilla greek yogurt]
+                      - key: unspecified
+                        name: Greek Yogurt (Unspecified Flavour)
+                        description: Greek yogurt with unknown plain or flavoured status; excluded from price comparisons.
+                  - key: regular_yogurt
+                    name: Regular Yogurt
+                    children:
+                      - key: plain
+                        name: Plain Regular Yogurt
+                        description: Explicitly identified plain regular yogurt, not Greek yogurt, dahi, or skyr.
+                        synonyms: [plain regular yogurt, plain regular yoghurt]
+                      - key: flavoured
+                        name: Flavoured Regular Yogurt
+                        description: Explicitly identified flavoured regular yogurt, not Greek yogurt or skyr.
+                        synonyms: [flavoured regular yogurt, flavored regular yogurt]
+                  - key: dahi
+                    name: Dahi
+                    synonyms: [dahi, indian yogurt, indian yoghurt]
+                    description: Cultured dahi, distinct from Greek and other yogurt products.
+                  - key: skyr
+                    name: Skyr
+                    synonyms: [skyr, icelandic yogurt]
                   - key: fermented_drinks
                     name: Fermented Dairy Drinks
                     synonyms: [kefir, lassi, yogurt drink]

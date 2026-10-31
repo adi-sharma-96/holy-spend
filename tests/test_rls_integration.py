@@ -1,6 +1,7 @@
 import os
 from collections.abc import Iterator
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
 
@@ -100,9 +101,9 @@ def seed_transaction(conn: Any, user_id: UUID, total: str) -> UUID:
     row = conn.execute(
         """
         insert into transactions (
-            user_id, transaction_type, source_type, transaction_date, currency, total_amount
+            user_id, transaction_type, source_type, ingestion_method, transaction_date, currency, total_amount
         )
-        values (%(user_id)s, 'expense', 'manual', current_date, 'CAD', %(total)s)
+        values (%(user_id)s, 'expense', 'manual', 'manual', current_date, 'CAD', %(total)s)
         returning id
         """,
         {"user_id": user_id, "total": total},
@@ -533,3 +534,52 @@ def test_receipt_file_rls_hides_other_users_files(
         ).fetchall()
 
     assert [row["id"] for row in rows] == [file_a]
+
+
+def test_specific_product_backfill_uses_receipt_evidence_and_preserves_reviews(
+    admin_conn: Any, seeded_transactions: tuple[UUID, UUID]
+) -> None:
+    """Execute the real migration with ambiguous and previously reviewed records."""
+    tx_a, _ = seeded_transactions
+    prefix = "food_dining.groceries."
+    yogurt = "dairy_eggs.yogurt_fermented.yogurt"
+    fruit = "produce.fruit.tropical.tropical_other"
+    cases = [
+        ("Kiwi", None, fruit, "model", "suggested", "produce.fruit.tropical.kiwis"),
+        ("Greek plain yogurt", None, yogurt, "model", "suggested",
+         "dairy_eggs.yogurt_fermented.greek_yogurt.plain"),
+        ("Regular vanilla yogurt", None, yogurt, "model", "suggested",
+         "dairy_eggs.yogurt_fermented.regular_yogurt.flavoured"),
+        ("Dahi", None, yogurt, "model", "suggested", "dairy_eggs.yogurt_fermented.dahi"),
+        ("Yogurt", "Greek plain yogurt", yogurt, "model", "suggested", yogurt),
+        (None, "Greek plain yogurt", yogurt, "model", "suggested", yogurt),
+        ("Greek plain yogurt", None, yogurt, "user", "suggested", yogurt),
+        ("Greek plain yogurt", None, yogurt, "model", "reviewed", yogurt),
+        ("Greek plain yogurt", None, yogurt, "model", "needs_review", yogurt),
+        ("Greek dahi plain", None, yogurt, "model", "suggested", yogurt),
+        ("Greek plain vanilla", None, yogurt, "model", "suggested", yogurt),
+        ("Kiwi lychee", None, fruit, "model", "suggested", fruit),
+        ("Kiwi juice", None, fruit, "model", "suggested", fruit),
+    ]
+    expected = {}
+    for raw, interpreted, old, source, status, target in cases:
+        row = admin_conn.execute(
+            """insert into transaction_items
+            (user_id, transaction_id, raw_name, interpreted_name, taxonomy_node_id,
+             classification_source, classification_review_status, quantity, line_total_amount)
+            select %s, %s, %s, %s, id, %s, %s, 2, 7.50 from taxonomy_nodes
+            where stable_key = %s returning id""",
+            (USER_A, tx_a, raw, interpreted, source, status, prefix + old),
+        ).fetchone()
+        expected[row["id"]] = (prefix + target, Decimal("2"), Decimal("7.50"))
+    admin_conn.commit()
+    migration = Path(__file__).resolve().parents[1] / "supabase/migrations/0031_backfill_specific_fruit_and_yogurt.sql"
+    for _ in range(2):
+        admin_conn.execute(migration.read_text(encoding="utf-8"))
+        rows = admin_conn.execute(
+            """select item.id, node.stable_key, item.quantity, item.line_total_amount
+            from transaction_items item join taxonomy_nodes node on node.id = item.taxonomy_node_id
+            where item.transaction_id = %s""", (tx_a,),
+        ).fetchall()
+        assert {r["id"]: (r["stable_key"], r["quantity"], r["line_total_amount"]) for r in rows} == expected
+        admin_conn.commit()
