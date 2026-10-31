@@ -2,6 +2,7 @@ import base64
 import hashlib
 import itertools
 import secrets as py_secrets
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
@@ -33,9 +34,30 @@ class FakeConn:
     def __init__(self, responses: dict[str, dict[str, Any] | None] | None = None) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self._responses = responses or {}
+        self.codes: dict[str, dict[str, Any]] = {}
 
     def execute(self, sql: str, params: dict[str, Any] | None = None) -> FakeResult:
         self.calls.append((sql, params or {}))
+        if "clock_timestamp()" in sql:
+            return FakeResult({"checked_at": datetime.now(UTC)})
+        if "insert into oauth_authorization_codes" in sql and params is not None:
+            self.codes[params["code_hash"]] = {
+                "user_id": params["user_id"], "client_id": params["client_id"],
+                "redirect_uri": params["redirect_uri"], "redirect_uri_provided_explicitly": params["explicit"],
+                "code_challenge": params["challenge"], "scopes": params["scopes"],
+                "resource": params["resource"],
+                "expires_at": datetime.now(UTC) + timedelta(seconds=params["ttl"]),
+            }
+            return FakeResult(None)
+        if "oauth_authorization_codes" in sql and params is not None:
+            row = self.codes.get(params["code_hash"])
+            if row is None or row["user_id"] != params["user_id"] or row["client_id"] != params["client_id"]:
+                return FakeResult(None)
+            if row["expires_at"] <= datetime.now(UTC):
+                return FakeResult(None)
+            if "delete from" in sql:
+                self.codes.pop(params["code_hash"])
+            return FakeResult(row)
         for marker, row in self._responses.items():
             if marker in sql:
                 return FakeResult(row)
@@ -277,7 +299,8 @@ def test_token_exchange_rejects_wrong_code_verifier(monkeypatch: pytest.MonkeyPa
 
 
 def test_token_exchange_rejects_expired_code(monkeypatch: pytest.MonkeyPatch) -> None:
-    patch_db(monkeypatch, FakeConn())
+    conn = FakeConn()
+    patch_db(monkeypatch, conn)
     settings = make_settings()
     provider = SingleOwnerOAuthProvider(settings)
     app = FastAPI()
@@ -287,7 +310,7 @@ def test_token_exchange_rejects_expired_code(monkeypatch: pytest.MonkeyPatch) ->
     with TestClient(app) as client:
         authorize_response = client.get("/authorize", params=authorize_query(challenge), follow_redirects=False)
         code = parse_qs(urlsplit(authorize_response.headers["location"]).query)["code"][0]
-        provider._pending_codes[code].expires_at = 0.0
+        conn.codes[oauth_provider.hash_authorization_code(code)]["expires_at"] = datetime.fromtimestamp(0, UTC)
 
         response = client.post(
             "/token",

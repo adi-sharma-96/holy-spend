@@ -13,8 +13,11 @@ $$;
 
 create table if not exists auth.users (
     id uuid primary key,
+    aud text,
+    role text,
     email text,
-    created_at timestamptz not null default now()
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
 );
 
 create or replace function auth.uid()

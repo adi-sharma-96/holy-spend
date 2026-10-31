@@ -1,4 +1,6 @@
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 import pytest
@@ -27,9 +29,30 @@ class FakeConn:
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.commits = 0
         self._responses = responses or {}
+        self.codes: dict[str, dict[str, Any]] = {}
 
     def execute(self, sql: str, params: dict[str, Any] | None = None) -> FakeResult:
         self.calls.append((sql, params or {}))
+        if "clock_timestamp()" in sql:
+            return FakeResult({"checked_at": datetime.now(UTC)})
+        if "insert into oauth_authorization_codes" in sql and params is not None:
+            self.codes[params["code_hash"]] = {
+                "user_id": params["user_id"], "client_id": params["client_id"],
+                "redirect_uri": params["redirect_uri"], "redirect_uri_provided_explicitly": params["explicit"],
+                "code_challenge": params["challenge"], "scopes": params["scopes"],
+                "resource": params["resource"],
+                "expires_at": datetime.now(UTC) + timedelta(seconds=params["ttl"]),
+            }
+            return FakeResult(None)
+        if "oauth_authorization_codes" in sql and params is not None:
+            row = self.codes.get(params["code_hash"])
+            if row is None or row["user_id"] != params["user_id"] or row["client_id"] != params["client_id"]:
+                return FakeResult(None)
+            if row["expires_at"] <= datetime.now(UTC):
+                return FakeResult(None)
+            if "delete from" in sql:
+                self.codes.pop(params["code_hash"])
+            return FakeResult(row)
         for marker, row in self._responses.items():
             if marker in sql:
                 return FakeResult(row)
@@ -132,7 +155,9 @@ async def test_register_client_is_disabled() -> None:
 
 
 @pytest.mark.anyio
-async def test_authorize_stores_pending_code_and_redirects_with_state() -> None:
+async def test_authorize_stores_pending_code_and_redirects_with_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    conn = FakeConn()
+    patch_db(monkeypatch, conn)
     provider = SingleOwnerOAuthProvider(make_settings())
     client = await provider.get_client("gw-client")
     assert client is not None
@@ -143,14 +168,15 @@ async def test_authorize_stores_pending_code_and_redirects_with_state() -> None:
     assert redirect_url.startswith(oauth_provider.CLAUDE_REDIRECT_URI)
     assert "state=xyz" in redirect_url
     assert "code=" in redirect_url
-    assert len(provider._pending_codes) == 1
-    pending = next(iter(provider._pending_codes.values()))
-    assert pending.code_challenge == "challenge-abc"
-    assert pending.scopes == list(oauth_provider.FULL_SCOPES)
+    assert len(conn.codes) == 1
+    pending = next(iter(conn.codes.values()))
+    assert pending["code_challenge"] == "challenge-abc"
+    assert pending["scopes"] == list(oauth_provider.FULL_SCOPES)
 
 
 @pytest.mark.anyio
-async def test_load_authorization_code_returns_none_for_unknown_code() -> None:
+async def test_load_authorization_code_returns_none_for_unknown_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    patch_db(monkeypatch, FakeConn())
     provider = SingleOwnerOAuthProvider(make_settings())
     client = await provider.get_client("gw-client")
     assert client is not None
@@ -170,14 +196,13 @@ async def test_exchange_authorization_code_mints_pat_and_refresh_row_then_consum
     provider = SingleOwnerOAuthProvider(make_settings())
     client = await provider.get_client("gw-client")
     assert client is not None
-    await provider.authorize(client, make_params())
-    code = next(iter(provider._pending_codes))
+    code = parse_qs(urlsplit(await provider.authorize(client, make_params())).query)["code"][0]
     auth_code = await provider.load_authorization_code(client, code)
     assert auth_code is not None
 
     token = await provider.exchange_authorization_code(client, auth_code)
 
-    assert code not in provider._pending_codes
+    assert oauth_provider.hash_authorization_code(code) not in conn.codes
     assert token.access_token == "det_minted-access"
     assert token.refresh_token == "minted-refresh"
     assert token.expires_in == oauth_provider.ACCESS_TOKEN_TTL_SECONDS

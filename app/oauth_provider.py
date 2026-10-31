@@ -1,8 +1,9 @@
 import asyncio
+import hashlib
 import secrets
 import time
-from dataclasses import dataclass
-from typing import Any
+from contextvars import ContextVar
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from mcp.server.auth.provider import (
@@ -11,13 +12,17 @@ from mcp.server.auth.provider import (
     AuthorizationParams,
     OAuthAuthorizationServerProvider,
     RefreshToken,
+    TokenError,
     construct_redirect_uri,
 )
 from mcp.server.auth.routes import create_auth_routes, create_protected_resource_routes
 from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyHttpUrl, AnyUrl
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.routing import Route
+from starlette.types import Receive, Scope, Send
 
 from app.config import Settings
 from app.db import connection, user_transaction
@@ -42,6 +47,7 @@ ACCESS_TOKEN_TTL_SECONDS = 180 * 24 * 60 * 60
 REFRESH_TOKEN_TTL_SECONDS = 365 * 24 * 60 * 60
 
 CLAUDE_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
+_token_request_resource: ContextVar[str | None] = ContextVar("oauth_token_request_resource", default=None)
 
 
 def generate_refresh_token() -> str:
@@ -61,14 +67,13 @@ class _RefreshToken(RefreshToken):
     refresh_token_row_id: UUID
 
 
-@dataclass
-class _PendingCode:
-    code_challenge: str
-    redirect_uri: str
-    redirect_uri_provided_explicitly: bool
-    scopes: list[str]
-    expires_at: float
-    resource: str | None
+def hash_authorization_code(code: str) -> str:
+    """SHA-256 is sufficient for independently generated 256-bit random codes."""
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+class _InvalidAuthorizationCode(Exception):
+    pass
 
 
 class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, _RefreshToken, _AccessToken]):
@@ -89,7 +94,7 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
     same way scripts/manage_pat.py does), so the existing PAT-based /mcp
     gateway auth (app/security.py) needs no changes to accept them. Refresh
     tokens are tracked in oauth_refresh_tokens, one row per PAT, so refresh
-    rotation can revoke the old PAT and mint a fresh one atomically.
+    rotation is handled separately from authorization-code redemption.
     """
 
     def __init__(self, settings: Settings) -> None:
@@ -111,11 +116,6 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
             response_types=["code"],
             scope=" ".join(FULL_SCOPES),
         )
-        # Authorization codes are single-use and live for ~2 minutes between
-        # the auto-approved /authorize redirect and the client's /token call;
-        # an in-memory store (lost on restart, fine given that lifetime) keeps
-        # this from needing its own migration on top of oauth_refresh_tokens.
-        self._pending_codes: dict[str, _PendingCode] = {}
 
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
         if client_id == self._client.client_id:
@@ -126,44 +126,119 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
         raise NotImplementedError("Dynamic client registration is disabled; use the pre-shared client")
 
     async def authorize(self, client: OAuthClientInformationFull, params: AuthorizationParams) -> str:
-        self._prune_expired_codes()
         code = generate_authorization_code()
-        self._pending_codes[code] = _PendingCode(
-            code_challenge=params.code_challenge,
-            redirect_uri=str(params.redirect_uri),
-            redirect_uri_provided_explicitly=params.redirect_uri_provided_explicitly,
-            scopes=list(params.scopes) if params.scopes else list(FULL_SCOPES),
-            expires_at=time.time() + AUTHORIZATION_CODE_TTL_SECONDS,
-            resource=params.resource,
-        )
+        await asyncio.to_thread(self._store_authorization_code, code, client, params)
         return construct_redirect_uri(str(params.redirect_uri), code=code, state=params.state)
+
+    def _store_authorization_code(
+        self, code: str, client: OAuthClientInformationFull, params: AuthorizationParams
+    ) -> None:
+        with user_transaction(self._owner_user_id) as conn:
+            conn.execute(
+                """insert into oauth_authorization_codes
+                   (code_hash, user_id, client_id, redirect_uri,
+                    redirect_uri_provided_explicitly, code_challenge, scopes, resource, expires_at)
+                   values (%(code_hash)s, %(user_id)s, %(client_id)s, %(redirect_uri)s,
+                           %(explicit)s, %(challenge)s, %(scopes)s, %(resource)s,
+                           now() + make_interval(secs => %(ttl)s))""",
+                {
+                    "code_hash": hash_authorization_code(code),
+                    "user_id": self._owner_user_id,
+                    "client_id": client.client_id,
+                    "redirect_uri": str(params.redirect_uri),
+                    "explicit": params.redirect_uri_provided_explicitly,
+                    "challenge": params.code_challenge,
+                    "scopes": list(params.scopes) if params.scopes else list(FULL_SCOPES),
+                    "resource": params.resource,
+                    "ttl": AUTHORIZATION_CODE_TTL_SECONDS,
+                },
+            )
 
     async def load_authorization_code(
         self, client: OAuthClientInformationFull, authorization_code: str
     ) -> AuthorizationCode | None:
-        pending = self._pending_codes.get(authorization_code)
-        if pending is None:
+        row = await asyncio.to_thread(self._load_authorization_code, client, authorization_code)
+        if row is None:
             return None
         return AuthorizationCode(
             code=authorization_code,
-            scopes=pending.scopes,
-            expires_at=pending.expires_at,
-            client_id=client.client_id or "",
-            code_challenge=pending.code_challenge,
-            redirect_uri=AnyUrl(pending.redirect_uri),
-            redirect_uri_provided_explicitly=pending.redirect_uri_provided_explicitly,
-            resource=pending.resource,
-            subject=str(self._owner_user_id),
+            scopes=list(row["scopes"]),
+            expires_at=row["expires_at"].timestamp(),
+            client_id=row["client_id"],
+            code_challenge=row["code_challenge"],
+            redirect_uri=AnyUrl(row["redirect_uri"]),
+            redirect_uri_provided_explicitly=row["redirect_uri_provided_explicitly"],
+            resource=row["resource"],
+            subject=str(row["user_id"]),
         )
+
+    def _load_authorization_code(
+        self, client: OAuthClientInformationFull, code: str
+    ) -> dict[str, Any] | None:
+        with user_transaction(self._owner_user_id) as conn:
+            row = conn.execute(
+                """select user_id, client_id, redirect_uri, redirect_uri_provided_explicitly,
+                          code_challenge, scopes, resource, expires_at
+                   from oauth_authorization_codes
+                   where code_hash = %(code_hash)s and user_id = %(user_id)s
+                     and client_id = %(client_id)s and expires_at > now()""",
+                {
+                    "code_hash": hash_authorization_code(code),
+                    "user_id": self._owner_user_id,
+                    "client_id": client.client_id,
+                },
+            ).fetchone()
+            return cast(dict[str, Any] | None, row)
 
     async def exchange_authorization_code(
         self, client: OAuthClientInformationFull, authorization_code: AuthorizationCode
     ) -> OAuthToken:
-        # PKCE, redirect_uri consistency, and expiry were already verified by
-        # the SDK's token handler before this is called; a code is only ever
-        # consumed once, so drop it here regardless of what happens next.
-        self._pending_codes.pop(authorization_code.code, None)
-        return await asyncio.to_thread(self._mint_tokens, list(authorization_code.scopes))
+        return await asyncio.to_thread(self._redeem_authorization_code, client, authorization_code)
+
+    def _redeem_authorization_code(
+        self, client: OAuthClientInformationFull, authorization_code: AuthorizationCode
+    ) -> OAuthToken:
+        try:
+            return self._redeem_authorization_code_transaction(client, authorization_code)
+        except _InvalidAuthorizationCode:
+            raise TokenError(error="invalid_grant", error_description="authorization code does not exist") from None
+
+    def _redeem_authorization_code_transaction(
+        self, client: OAuthClientInformationFull, authorization_code: AuthorizationCode
+    ) -> OAuthToken:
+        with user_transaction(self._owner_user_id) as conn:
+            row = conn.execute(
+                """delete from oauth_authorization_codes
+                   where code_hash = %(code_hash)s and user_id = %(user_id)s
+                     and client_id = %(client_id)s
+                   returning user_id, client_id, redirect_uri,
+                          redirect_uri_provided_explicitly, code_challenge, scopes,
+                          resource, expires_at""",
+                {
+                    "code_hash": hash_authorization_code(authorization_code.code),
+                    "user_id": self._owner_user_id,
+                    "client_id": client.client_id,
+                },
+            ).fetchone()
+            # DELETE has acquired the row lock before this clock read. If the
+            # code expired while waiting, _InvalidAuthorizationCode rolls the
+            # deletion back. now() would still report transaction start time.
+            checked_at = conn.execute("select clock_timestamp() as checked_at").fetchone()["checked_at"]
+            if row is None or (
+                row["expires_at"] <= checked_at
+                or row["user_id"] != self._owner_user_id
+                or row["client_id"] != authorization_code.client_id
+                or row["redirect_uri"] != str(authorization_code.redirect_uri)
+                or row["redirect_uri_provided_explicitly"] != authorization_code.redirect_uri_provided_explicitly
+                or row["code_challenge"] != authorization_code.code_challenge
+                or list(row["scopes"]) != list(authorization_code.scopes)
+                or row["resource"] != authorization_code.resource
+                or (_token_request_resource.get() is not None and row["resource"] != _token_request_resource.get())
+                or authorization_code.subject != str(self._owner_user_id)
+            ):
+                # A mismatched loaded object must not consume the persisted code.
+                raise _InvalidAuthorizationCode
+            return self._insert_tokens(conn, list(row["scopes"]))
 
     async def load_refresh_token(
         self, client: OAuthClientInformationFull, refresh_token: str
@@ -184,13 +259,11 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
     async def revoke_token(self, token: _AccessToken | _RefreshToken) -> None:
         await asyncio.to_thread(self._revoke, token)
 
-    def _prune_expired_codes(self) -> None:
-        now = time.time()
-        expired = [code for code, pending in self._pending_codes.items() if pending.expires_at < now]
-        for code in expired:
-            self._pending_codes.pop(code, None)
-
     def _mint_tokens(self, scopes: list[str]) -> OAuthToken:
+        with user_transaction(self._owner_user_id) as conn:
+            return self._insert_tokens(conn, scopes)
+
+    def _insert_tokens(self, conn: Any, scopes: list[str]) -> OAuthToken:
         raw_access = generate_pat()
         raw_refresh = generate_refresh_token()
         access_expires_at = time.time() + ACCESS_TOKEN_TTL_SECONDS
@@ -202,33 +275,32 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
         # SELECT under row-level security.
         pat_id = uuid4()
 
-        with user_transaction(self._owner_user_id) as conn:
-            conn.execute(
-                """
-                insert into personal_access_tokens (id, user_id, token_hash, name, scopes, expires_at)
-                values (%(id)s, %(user_id)s, %(token_hash)s, %(name)s, %(scopes)s, to_timestamp(%(expires_at)s))
-                """,
-                {
-                    "id": pat_id,
-                    "user_id": self._owner_user_id,
-                    "token_hash": hash_pat(raw_access, self._settings),
-                    "name": f"claude-oauth-{int(time.time())}",
-                    "scopes": scopes,
-                    "expires_at": access_expires_at,
-                },
-            )
-            conn.execute(
-                """
-                insert into oauth_refresh_tokens (user_id, token_hash, pat_token_id, expires_at)
-                values (%(user_id)s, %(token_hash)s, %(pat_token_id)s, to_timestamp(%(expires_at)s))
-                """,
-                {
-                    "user_id": self._owner_user_id,
-                    "token_hash": hash_pat(raw_refresh, self._settings),
-                    "pat_token_id": pat_id,
-                    "expires_at": refresh_expires_at,
-                },
-            )
+        conn.execute(
+            """
+            insert into personal_access_tokens (id, user_id, token_hash, name, scopes, expires_at)
+            values (%(id)s, %(user_id)s, %(token_hash)s, %(name)s, %(scopes)s, to_timestamp(%(expires_at)s))
+            """,
+            {
+                "id": pat_id,
+                "user_id": self._owner_user_id,
+                "token_hash": hash_pat(raw_access, self._settings),
+                "name": f"claude-oauth-{int(time.time())}",
+                "scopes": scopes,
+                "expires_at": access_expires_at,
+            },
+        )
+        conn.execute(
+            """
+            insert into oauth_refresh_tokens (user_id, token_hash, pat_token_id, expires_at)
+            values (%(user_id)s, %(token_hash)s, %(pat_token_id)s, to_timestamp(%(expires_at)s))
+            """,
+            {
+                "user_id": self._owner_user_id,
+                "token_hash": hash_pat(raw_refresh, self._settings),
+                "pat_token_id": pat_id,
+                "expires_at": refresh_expires_at,
+            },
+        )
 
         return OAuthToken(
             access_token=raw_access,
@@ -312,8 +384,7 @@ def build_oauth_routes(settings: Settings, provider: SingleOwnerOAuthProvider | 
     plus RFC 9728 protected-resource metadata for /mcp. Caller is responsible
     for checking that OAuth is actually configured before calling this.
 
-    Accepts a pre-built provider so tests can hold a reference to inspect or
-    mutate its in-memory state; production always lets this construct one."""
+    Accepts a pre-built provider for tests; production constructs one."""
     if settings.oauth_issuer_url is None:
         raise ValueError("OAUTH_ISSUER_URL is required to build OAuth routes")
 
@@ -325,6 +396,60 @@ def build_oauth_routes(settings: Settings, provider: SingleOwnerOAuthProvider | 
         client_registration_options=ClientRegistrationOptions(enabled=False),
         revocation_options=RevocationOptions(enabled=True),
     )
+    # MCP SDK 1.29 validates PKCE and redirect URI but does not forward the
+    # parsed token-request resource to the provider callback. Preserve its
+    # handler while making an explicit resource available to the transaction.
+    for route in routes:
+        if isinstance(route, Route) and route.path == "/token":
+            original_app = route.app
+
+            async def bound_token_app(
+                scope: Scope, receive: Receive, send: Send, original_app: Any = original_app
+            ) -> None:
+                request = Request(scope, receive)
+                body = await request.body()
+                content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+                if content_type != "application/x-www-form-urlencoded":
+                    await JSONResponse(
+                        {"error": "invalid_request", "error_description": "Unsupported token request encoding"},
+                        status_code=400,
+                        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                    )(scope, receive, send)
+                    return
+                try:
+                    form = await request.form()
+                except Exception:
+                    await JSONResponse(
+                        {"error": "invalid_request", "error_description": "Invalid token request form"},
+                        status_code=400,
+                        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                    )(scope, receive, send)
+                    return
+                if any(len(form.getlist(key)) != 1 for key in form):
+                    await JSONResponse(
+                        {"error": "invalid_request", "error_description": "Duplicate token request parameter"},
+                        status_code=400,
+                        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                    )(scope, receive, send)
+                    return
+                resource = form.get("resource") if form.get("grant_type") == "authorization_code" else None
+                context = _token_request_resource.set(str(resource) if resource is not None else None)
+                replayed = False
+
+                async def replay_receive() -> Any:
+                    nonlocal replayed
+                    if not replayed:
+                        replayed = True
+                        return {"type": "http.request", "body": body, "more_body": False}
+                    return await receive()
+
+                try:
+                    await original_app(scope, replay_receive, send)
+                finally:
+                    _token_request_resource.reset(context)
+
+            route.app = bound_token_app
+            break
     routes += create_protected_resource_routes(
         resource_url=AnyHttpUrl(settings.oauth_resource_server_url()),
         authorization_servers=[issuer_url],

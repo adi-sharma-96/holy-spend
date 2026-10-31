@@ -182,6 +182,12 @@ begin
         grant insert, update on table public.oauth_refresh_tokens to expense_app;
         alter table public.oauth_refresh_tokens force row level security;
     end if;
+
+    if to_regclass('public.oauth_authorization_codes') is not null then
+        revoke all on table public.oauth_authorization_codes from expense_app;
+        grant select, insert, delete on table public.oauth_authorization_codes to expense_app;
+        alter table public.oauth_authorization_codes force row level security;
+    end if;
 end;
 $$;
 
