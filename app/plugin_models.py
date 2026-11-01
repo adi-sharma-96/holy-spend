@@ -314,6 +314,14 @@ class DashboardInsight(BaseModel):
     tone: str = "neutral"
 
 
+class ComparisonCoverage(BaseModel):
+    eligible_items: int = 0
+    excluded_items: int = 0
+    eligible_spend: Decimal = Decimal("0")
+    excluded_spend: Decimal = Decimal("0")
+    reasons: dict[str, int] = Field(default_factory=dict)
+
+
 class ExpenseDashboard(BaseModel):
     display_name: str | None = None
     default_currency: str
@@ -326,6 +334,7 @@ class ExpenseDashboard(BaseModel):
     recent_transactions: list[TransactionSummary]
     needs_review_count: int
     price_changes: list[PriceChange]
+    price_coverage: ComparisonCoverage = Field(default_factory=ComparisonCoverage)
     confirmed_only: bool = True
 
 
@@ -457,12 +466,14 @@ class PersonalBasketIndex(BaseModel):
     coverage_percent: Decimal
     confidence: str
     products: list[BasketProduct] = Field(default_factory=list)
+    comparison_coverage: ComparisonCoverage = Field(default_factory=ComparisonCoverage)
 
 
 class ItemPriceHistory(BaseModel):
     identity_key: str
     label: str
     series: list[ItemPriceSeries]
+    comparison_coverage: ComparisonCoverage = Field(default_factory=ComparisonCoverage)
 
 
 class NutritionQueueRequest(BaseModel):

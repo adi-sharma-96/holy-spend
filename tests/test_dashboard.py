@@ -29,6 +29,25 @@ class FakeResult:
         return self.rows
 
 
+def _evidence(name: str, unit: str, *, measured: bool = True) -> dict[str, Any]:
+    return {
+        "product_identity_key": name.replace(" ", "-"),
+        "product_type_key": name.replace(" ", "-"),
+        "classification_review_status": "reviewed",
+        "field_provenance": {
+            "identity": {"source": "user_confirmed"},
+            "product_type": {"source": "user_confirmed"},
+            "measured_value": {"source": "observed_receipt"},
+            "quantity": {"source": "observed_receipt"},
+        },
+        "normalized_price_is_estimated": False,
+        "normalized_unit": unit,
+        "has_refund": False,
+        "measured_value": Decimal("1") if measured else None,
+        "quantity": None if measured else Decimal("1"),
+    }
+
+
 class FakeDashboardConn:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
@@ -132,8 +151,7 @@ class FakeDashboardConn:
                 ]
             )
         if "dashboard:price-changes" in sql:
-            return FakeResult(
-                [
+            rows = [
                     {
                         "normalized_name": "honeycrisp apples",
                         "taxonomy_key": "food_dining.groceries.produce.fruit.apples_pears.apples",
@@ -189,7 +207,12 @@ class FakeDashboardConn:
                         "id": ITEM_ID,
                     },
                 ]
-            )
+            for row in rows:
+                original_measurement = row["measured_value"]
+                row.update(_evidence(str(row["normalized_name"]), str(row["normalized_unit"])))
+                row["measured_value"] = original_measurement
+                row["normalized_unit_price_amount"] = row["price"]
+            return FakeResult(rows)
         if "dashboard:item-price-history" in sql:
             return FakeResult(
                 [
@@ -203,6 +226,10 @@ class FakeDashboardConn:
                         "brand": None,
                         "concept_id": None,
                         "variant_id": None,
+                        "product_identity_key": None,
+                        "product_type_key": None,
+                        "field_provenance": {},
+                        "classification_review_status": "reviewed",
                         "taxonomy_key": "food_dining.groceries.produce.fruit.apples_pears.apples",
                         "taxonomy_name": "Apples",
                         "currency": "CAD",
@@ -290,7 +317,13 @@ def _basket_row(
     merchant: str = "Test Market",
     brand: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    if taxonomy_key.endswith(".apples_pears"):
+        taxonomy_key += ".apples"
+    if taxonomy_key.endswith(".yogurt_fermented.yogurt"):
+        taxonomy_key = taxonomy_key.replace(".yogurt_fermented.yogurt", ".yogurt_fermented.greek_yogurt.flavoured")
+    if taxonomy_key.endswith(".alliums"):
+        taxonomy_key += ".onions"
+    row = {
         "normalized_name": name,
         "brand": brand,
         "taxonomy_key": taxonomy_key,
@@ -300,6 +333,10 @@ def _basket_row(
         "transaction_date": when,
         "merchant": merchant,
     }
+    row.update(_evidence(name, unit, measured=unit != "each"))
+    row["normalized_unit_price_amount"] = row["price"]
+    row["currency"] = "CAD"
+    return row
 
 
 def test_calendar_month_window_compares_equal_month_to_date_progress() -> None:
@@ -361,19 +398,14 @@ def test_dashboard_keeps_currencies_separate_and_builds_focused_insights() -> No
     assert response.recent_transactions[0].item_count == 5
     assert response.needs_review_count == 2
     assert response.price_changes[0].normalized_unit == "kg"
-    assert response.price_changes[0].identity_key == "product:apples"
-    assert response.price_changes[0].sample_size == 2
-    assert response.price_changes[0].best_merchant == "Budget Foods"
-    assert response.price_changes[0].best_price == Decimal("5.49")
-    assert response.price_changes[0].best_quantity_label == "2 kg"
-    assert response.price_changes[0].comparison_merchant == "Fresh Market"
-    assert response.price_changes[0].comparison_price == Decimal("6.59")
-    assert response.price_changes[0].savings_amount == Decimal("1.10")
-    assert response.price_changes[0].savings_percent == Decimal("16.7")
-    assert response.price_changes[0].recent_prices == [Decimal("5.49"), Decimal("6.59")]
+    assert response.price_changes[0].identity_key == "product:honeycrisp-apples"
+    assert response.price_changes[0].sample_size == 1
+    assert response.price_changes[0].comparison_price is None
+    assert response.price_changes[0].savings_amount == Decimal("0")
     assert response.price_changes[1].label == "Onions"
     assert response.price_changes[1].delta_amount is None
     assert response.price_changes[1].recent_prices == [Decimal("3.67")]
+    assert response.price_changes[2].identity_key == "product:gala-apples"
     assert len(response.insights) == 3
     for sql, params in conn.calls:
         assert params["user_id"] == USER_ID
@@ -385,7 +417,7 @@ def test_dashboard_keeps_currencies_separate_and_builds_focused_insights() -> No
             assert "node.stable_key = 'unclassified.needs_review'" in sql
         if "dashboard:price-changes" in sql:
             assert "t.transaction_date <= %(current_end)s" in sql
-            assert "not i.normalized_price_is_estimated" in sql
+            assert "i.normalized_price_is_estimated" in sql
 
 
 def test_dashboard_drops_categories_with_no_current_period_spend() -> None:
@@ -502,17 +534,13 @@ def test_merchant_breakdown_respects_the_requested_limit() -> None:
     ]
 
 
-def test_price_history_uses_one_identity_and_groups_by_currency_and_unit() -> None:
+def test_price_history_excludes_unverified_legacy_purchase() -> None:
     conn = FakeDashboardConn()
     response = DashboardRepository(conn, USER_ID).get_item_price_history(
         ItemPriceHistoryRequest(identity_key="product:apples", currency="cad")
     )
 
-    assert response.label == "Apples"
-    assert response.series[0].currency == "CAD"
-    assert response.series[0].normalized_unit == "kg"
-    assert response.series[0].points[0].measured_unit == "lb"
-    assert response.series[0].points[0].is_estimated is True
+    assert response.series == []
     sql, params = conn.calls[-1]
     assert params["currency"] == "CAD"
 
@@ -525,8 +553,7 @@ def test_item_price_history_basket_identity_never_falls_back_to_family() -> None
         )
     )
 
-    assert response.label == "Fresh Market Honeycrisp Apples"
-    assert response.series[0].points[0].measured_unit == "lb"
+    assert response.series == []
 
 
 class FakeDashboardConnTwoUnits(FakeDashboardConn):
@@ -537,8 +564,7 @@ class FakeDashboardConnTwoUnits(FakeDashboardConn):
     def execute(self, sql: str, params: dict[str, Any]) -> FakeResult:
         if "dashboard:item-price-history" in sql:
             self.calls.append((sql, params))
-            return FakeResult(
-                [
+            rows = [
                     {
                         "transaction_id": TRANSACTION_ID,
                         "transaction_item_id": ITEM_ID,
@@ -586,7 +612,14 @@ class FakeDashboardConnTwoUnits(FakeDashboardConn):
                         "line_total_amount": Decimal("6.11"),
                     },
                 ]
-            )
+            for row in rows:
+                row.update(_evidence(
+                    "croissants", str(row["normalized_unit"]), measured=row["normalized_unit"] == "kg"
+                ))
+                if row["normalized_unit"] == "each":
+                    row["unit"] = "each"
+                row["product_identity_key"] = "croissants"
+            return FakeResult(rows)
         return super().execute(sql, params)
 
 
@@ -895,10 +928,7 @@ def test_personal_basket_with_no_qualifying_products_is_honest_about_it() -> Non
     assert result.covered_spend == Decimal("0")
 
 
-def test_personal_basket_splits_the_same_product_by_store_and_brand() -> None:
-    # Buying the same staple at two different stores no longer blends into
-    # one series - each store gets its own product, and each needs its own
-    # repeat purchases to qualify.
+def test_personal_basket_compares_confirmed_product_across_merchants() -> None:
     rows = [
         _basket_row(
             "liquid detergent",
@@ -946,12 +976,9 @@ def test_personal_basket_splits_the_same_product_by_store_and_brand() -> None:
         PersonalBasketRequest(currency="cad")
     )
 
-    assert result.product_count == 2
-    stores = {product.merchant_name for product in result.products}
-    assert stores == {"Costco", "Walmart"}
-    for product in result.products:
-        assert product.label == "Tide Liquid Detergent"
-        assert product.purchase_count == 2
+    assert result.product_count == 1
+    assert result.products[0].label == "Tide Liquid Detergent"
+    assert result.products[0].purchase_count == 4
 
 
 def test_personal_basket_excludes_estimated_unit_prices_from_the_query() -> None:
@@ -963,4 +990,4 @@ def test_personal_basket_excludes_estimated_unit_prices_from_the_query() -> None
     )
 
     sql, _ = next(call for call in conn.calls if "dashboard:personal-basket" in call[0])
-    assert "not i.normalized_price_is_estimated" in sql
+    assert "i.normalized_price_is_estimated" in sql

@@ -2,7 +2,7 @@
 export const TAXONOMY_V2 = {
   "version": "2.0.0",
   "version_id": "c39450a8-ead7-53d3-821f-956df5f5eba5",
-  "content_hash": "6c2d94d7ab89a9639939ad366d4ca10b0662b5bf16f1efaf4660d70883f62c05",
+  "content_hash": "3dba3f1083b8bd3b3490864582a1f6cb4b7356a2dfe2bde264fc9679e9875642",
   "levels": [
     "Domain",
     "Group",
@@ -16896,13 +16896,249 @@ export const TAXONOMY_V2 = {
       "metadata": {}
     },
     {
+      "id": "44aa706a-a65c-5e0c-b5b8-b7d2c3a1b2db",
+      "stable_key": "food_dining.groceries.grains_pasta.flour.corn_flour",
+      "parent_key": "food_dining.groceries.grains_pasta.flour",
+      "name": "Corn Flour",
+      "description": "Corn Flour",
+      "level": 5,
+      "sort_order": 20,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "06b879c7-90a2-52c3-9494-520bcf50012b",
+          "stable_key": "food_dining.groceries.grains_pasta",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Grains, Rice & Pasta"
+        },
+        {
+          "id": "76fc65b5-0dc8-5318-b6c8-46c29dbc1f1e",
+          "stable_key": "food_dining.groceries.grains_pasta.flour",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Flour"
+        },
+        {
+          "id": "44aa706a-a65c-5e0c-b5b8-b7d2c3a1b2db",
+          "stable_key": "food_dining.groceries.grains_pasta.flour.corn_flour",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Corn Flour"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta",
+          "name": "Grains, Rice & Pasta"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta.flour",
+          "name": "Flour"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta.flour.corn_flour",
+          "name": "Corn Flour"
+        },
+        null
+      ],
+      "synonyms": [
+        "yellow corn flour",
+        "maize flour"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "47bd82b0-c12c-5fe4-8665-af8215a6044e",
+      "stable_key": "food_dining.groceries.grains_pasta.flour.ragi_flour",
+      "parent_key": "food_dining.groceries.grains_pasta.flour",
+      "name": "Ragi Flour",
+      "description": "Ragi Flour",
+      "level": 5,
+      "sort_order": 30,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "06b879c7-90a2-52c3-9494-520bcf50012b",
+          "stable_key": "food_dining.groceries.grains_pasta",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Grains, Rice & Pasta"
+        },
+        {
+          "id": "76fc65b5-0dc8-5318-b6c8-46c29dbc1f1e",
+          "stable_key": "food_dining.groceries.grains_pasta.flour",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Flour"
+        },
+        {
+          "id": "47bd82b0-c12c-5fe4-8665-af8215a6044e",
+          "stable_key": "food_dining.groceries.grains_pasta.flour.ragi_flour",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Ragi Flour"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta",
+          "name": "Grains, Rice & Pasta"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta.flour",
+          "name": "Flour"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta.flour.ragi_flour",
+          "name": "Ragi Flour"
+        },
+        null
+      ],
+      "synonyms": [
+        "finger millet flour"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "ec1aa920-8946-5047-817f-7856ba88314d",
+      "stable_key": "food_dining.groceries.grains_pasta.flour.sooji",
+      "parent_key": "food_dining.groceries.grains_pasta.flour",
+      "name": "Sooji",
+      "description": "Sooji",
+      "level": 5,
+      "sort_order": 40,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "06b879c7-90a2-52c3-9494-520bcf50012b",
+          "stable_key": "food_dining.groceries.grains_pasta",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Grains, Rice & Pasta"
+        },
+        {
+          "id": "76fc65b5-0dc8-5318-b6c8-46c29dbc1f1e",
+          "stable_key": "food_dining.groceries.grains_pasta.flour",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Flour"
+        },
+        {
+          "id": "ec1aa920-8946-5047-817f-7856ba88314d",
+          "stable_key": "food_dining.groceries.grains_pasta.flour.sooji",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Sooji"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta",
+          "name": "Grains, Rice & Pasta"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta.flour",
+          "name": "Flour"
+        },
+        {
+          "key": "food_dining.groceries.grains_pasta.flour.sooji",
+          "name": "Sooji"
+        },
+        null
+      ],
+      "synonyms": [
+        "semolina",
+        "rava"
+      ],
+      "metadata": {}
+    },
+    {
       "id": "18c649b7-8862-55f1-bff2-d666fb2460cc",
       "stable_key": "food_dining.groceries.grains_pasta.flour.atta",
       "parent_key": "food_dining.groceries.grains_pasta.flour",
       "name": "Atta",
       "description": "Atta",
       "level": 5,
-      "sort_order": 20,
+      "sort_order": 50,
       "is_assignable": true,
       "allowed_transaction_types": [
         "expense",
@@ -16978,7 +17214,7 @@ export const TAXONOMY_V2 = {
       "name": "Bread Flour",
       "description": "Bread Flour",
       "level": 5,
-      "sort_order": 30,
+      "sort_order": 60,
       "is_assignable": true,
       "allowed_transaction_types": [
         "expense",
@@ -17054,7 +17290,7 @@ export const TAXONOMY_V2 = {
       "name": "Chickpea Flour",
       "description": "Chickpea Flour",
       "level": 5,
-      "sort_order": 40,
+      "sort_order": 70,
       "is_assignable": true,
       "allowed_transaction_types": [
         "expense",
@@ -17253,7 +17489,7 @@ export const TAXONOMY_V2 = {
       "description": "Lentils",
       "level": 5,
       "sort_order": 10,
-      "is_assignable": true,
+      "is_assignable": false,
       "allowed_transaction_types": [
         "expense",
         "refund"
@@ -17323,6 +17559,184 @@ export const TAXONOMY_V2 = {
         "toor dal",
         "masoor dal",
         "moong dal"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "e21fe112-86ab-5905-8091-a663b38afc62",
+      "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils.urad",
+      "parent_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils",
+      "name": "Urad Dal",
+      "description": "Urad Dal",
+      "level": 6,
+      "sort_order": 10,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "2e29d74c-a22c-52d2-b0c3-6d57fe9db8ef",
+          "stable_key": "food_dining.groceries.pantry_cooking",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Pantry & Cooking"
+        },
+        {
+          "id": "9eec7cdd-621f-52a9-b014-1fd5dcfd4e11",
+          "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Pulses & Legumes"
+        },
+        {
+          "id": "58ca7c05-0990-5f71-8d75-2c38482d05ef",
+          "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Lentils"
+        },
+        {
+          "id": "e21fe112-86ab-5905-8091-a663b38afc62",
+          "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils.urad",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Urad Dal"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking",
+          "name": "Pantry & Cooking"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking.pulses_legumes",
+          "name": "Pulses & Legumes"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils",
+          "name": "Lentils"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils.urad",
+          "name": "Urad Dal"
+        }
+      ],
+      "synonyms": [
+        "urad gota",
+        "black gram"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "b987e29a-9eb6-557c-9e58-fc4fb11b300d",
+      "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils.moong",
+      "parent_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils",
+      "name": "Moong Dal",
+      "description": "Moong Dal",
+      "level": 6,
+      "sort_order": 20,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "2e29d74c-a22c-52d2-b0c3-6d57fe9db8ef",
+          "stable_key": "food_dining.groceries.pantry_cooking",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Pantry & Cooking"
+        },
+        {
+          "id": "9eec7cdd-621f-52a9-b014-1fd5dcfd4e11",
+          "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Pulses & Legumes"
+        },
+        {
+          "id": "58ca7c05-0990-5f71-8d75-2c38482d05ef",
+          "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Lentils"
+        },
+        {
+          "id": "b987e29a-9eb6-557c-9e58-fc4fb11b300d",
+          "stable_key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils.moong",
+          "level": 6,
+          "level_name": "Subclass",
+          "name": "Moong Dal"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking",
+          "name": "Pantry & Cooking"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking.pulses_legumes",
+          "name": "Pulses & Legumes"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils",
+          "name": "Lentils"
+        },
+        {
+          "key": "food_dining.groceries.pantry_cooking.pulses_legumes.lentils.moong",
+          "name": "Moong Dal"
+        }
+      ],
+      "synonyms": [
+        "mung beans",
+        "green gram"
       ],
       "metadata": {}
     },
@@ -21507,7 +21921,7 @@ export const TAXONOMY_V2 = {
       "description": "Frozen Produce",
       "level": 4,
       "sort_order": 10,
-      "is_assignable": true,
+      "is_assignable": false,
       "allowed_transaction_types": [
         "expense",
         "refund"
@@ -21563,6 +21977,241 @@ export const TAXONOMY_V2 = {
         null
       ],
       "synonyms": [],
+      "metadata": {}
+    },
+    {
+      "id": "043ef2e6-a3e7-5f5f-a95f-3a1db74a7771",
+      "stable_key": "food_dining.groceries.frozen_food.frozen_produce.frozen_berries",
+      "parent_key": "food_dining.groceries.frozen_food.frozen_produce",
+      "name": "Frozen Berries",
+      "description": "Frozen Berries",
+      "level": 5,
+      "sort_order": 10,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8f5814b8-68ad-5838-8da4-f8dc759b329b",
+          "stable_key": "food_dining.groceries.frozen_food",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Frozen Food"
+        },
+        {
+          "id": "f1f24ea1-4eff-5670-8c95-d46fc9575e73",
+          "stable_key": "food_dining.groceries.frozen_food.frozen_produce",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Frozen Produce"
+        },
+        {
+          "id": "043ef2e6-a3e7-5f5f-a95f-3a1db74a7771",
+          "stable_key": "food_dining.groceries.frozen_food.frozen_produce.frozen_berries",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Frozen Berries"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food",
+          "name": "Frozen Food"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food.frozen_produce",
+          "name": "Frozen Produce"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food.frozen_produce.frozen_berries",
+          "name": "Frozen Berries"
+        },
+        null
+      ],
+      "synonyms": [
+        "frozen berry blend",
+        "frozen mixed berries"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "420df155-1ea6-575e-962e-a85096a50070",
+      "stable_key": "food_dining.groceries.frozen_food.frozen_produce.frozen_peas",
+      "parent_key": "food_dining.groceries.frozen_food.frozen_produce",
+      "name": "Frozen Peas",
+      "description": "Frozen Peas",
+      "level": 5,
+      "sort_order": 20,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8f5814b8-68ad-5838-8da4-f8dc759b329b",
+          "stable_key": "food_dining.groceries.frozen_food",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Frozen Food"
+        },
+        {
+          "id": "f1f24ea1-4eff-5670-8c95-d46fc9575e73",
+          "stable_key": "food_dining.groceries.frozen_food.frozen_produce",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Frozen Produce"
+        },
+        {
+          "id": "420df155-1ea6-575e-962e-a85096a50070",
+          "stable_key": "food_dining.groceries.frozen_food.frozen_produce.frozen_peas",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Frozen Peas"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food",
+          "name": "Frozen Food"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food.frozen_produce",
+          "name": "Frozen Produce"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food.frozen_produce.frozen_peas",
+          "name": "Frozen Peas"
+        },
+        null
+      ],
+      "synonyms": [
+        "frozen green peas"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "b1250cbf-ae97-5aa6-a525-56230bbeb4dc",
+      "stable_key": "food_dining.groceries.frozen_food.frozen_produce.frozen_coconut",
+      "parent_key": "food_dining.groceries.frozen_food.frozen_produce",
+      "name": "Frozen Coconut",
+      "description": "Frozen Coconut",
+      "level": 5,
+      "sort_order": 30,
+      "is_assignable": true,
+      "allowed_transaction_types": [
+        "expense",
+        "refund"
+      ],
+      "path": [
+        {
+          "id": "e42bb662-178d-5a6e-b438-879cdc651e17",
+          "stable_key": "food_dining",
+          "level": 1,
+          "level_name": "Domain",
+          "name": "Food & Dining"
+        },
+        {
+          "id": "9fe239db-2fa5-5cfe-bfd3-4a2d082f77cd",
+          "stable_key": "food_dining.groceries",
+          "level": 2,
+          "level_name": "Group",
+          "name": "Groceries"
+        },
+        {
+          "id": "8f5814b8-68ad-5838-8da4-f8dc759b329b",
+          "stable_key": "food_dining.groceries.frozen_food",
+          "level": 3,
+          "level_name": "Category",
+          "name": "Frozen Food"
+        },
+        {
+          "id": "f1f24ea1-4eff-5670-8c95-d46fc9575e73",
+          "stable_key": "food_dining.groceries.frozen_food.frozen_produce",
+          "level": 4,
+          "level_name": "Subcategory",
+          "name": "Frozen Produce"
+        },
+        {
+          "id": "b1250cbf-ae97-5aa6-a525-56230bbeb4dc",
+          "stable_key": "food_dining.groceries.frozen_food.frozen_produce.frozen_coconut",
+          "level": 5,
+          "level_name": "Class",
+          "name": "Frozen Coconut"
+        }
+      ],
+      "reporting_levels": [
+        {
+          "key": "food_dining",
+          "name": "Food & Dining"
+        },
+        {
+          "key": "food_dining.groceries",
+          "name": "Groceries"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food",
+          "name": "Frozen Food"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food.frozen_produce",
+          "name": "Frozen Produce"
+        },
+        {
+          "key": "food_dining.groceries.frozen_food.frozen_produce.frozen_coconut",
+          "name": "Frozen Coconut"
+        },
+        null
+      ],
+      "synonyms": [
+        "frozen shredded coconut"
+      ],
       "metadata": {}
     },
     {

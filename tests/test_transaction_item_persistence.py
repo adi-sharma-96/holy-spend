@@ -13,6 +13,7 @@ from app.models import (
     TransactionStatus,
     TransactionType,
 )
+from app.product_evidence import ItemEvidence
 from app.repositories import TaxonomyRepository, TransactionRepository
 
 USER_ID = UUID("33333333-3333-3333-3333-333333333333")
@@ -79,7 +80,7 @@ class ItemInsertRepository(TransactionRepository):
         pass
 
     def get_item(self, transaction_id: UUID, item_id: UUID) -> Any:
-        return SimpleNamespace(id=item_id)
+        return SimpleNamespace(id=item_id, field_provenance=ItemEvidence())
 
 
 @pytest.mark.parametrize(

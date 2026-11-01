@@ -13,7 +13,8 @@ class PriceWatchIdentity:
 # appliances, clothing, kitchenware live outside these prefixes entirely, so
 # they can never appear in Deals no matter what matches). This tuple is the
 # single source of truth for "trackable" shared by both Price Watch (blended)
-# and My Inflation (exact) identity.
+# and My Inflation candidate filtering. Product comparisons require the
+# independent evidence gate in app/product_evidence.py.
 TRACKABLE_PREFIXES: tuple[str, ...] = (
     "food_dining.groceries.",
     "housing_utilities.household_operations.",
@@ -70,6 +71,8 @@ EXCLUDED_TAXONOMY_LEAVES: frozenset[str] = frozenset(
         "produce.vegetables.mixed_vegetables",
         "produce.vegetables.nightshades.peppers",
         "frozen_food.frozen_produce",
+        "frozen_food.frozen_produce.frozen_berries",
+        "pantry_cooking.pulses_legumes.lentils",
         "produce.salads_kits",
         "produce.herbs_aromatics.other_herbs",
         "meat_seafood_alternatives.seafood.fish.other_fish",
@@ -312,10 +315,10 @@ def canonical_price_watch_identity(
     taxonomy_name: str | None,
     normalized_unit: str | None,
 ) -> PriceWatchIdentity | None:
-    """Map a classified purchase to a measurable, comparable Deals product.
+    """Map a classified purchase to a trackable display label.
 
-    Groceries: the taxonomy leaf the classifying LLM already assigned *is*
-    the product — no text matching, no collision risk. Household operations,
+    This is a candidate filter only; it never establishes comparison identity.
+    Groceries use the taxonomy leaf for a label. Household operations,
     personal care, baby, pet, and OTC pharmacy: taxonomy there is still too
     shallow for leaf-level granularity, so normalized_name text matching
     against a curated PRODUCT_PATTERNS catalog is still how product-level

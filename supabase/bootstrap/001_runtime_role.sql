@@ -132,6 +132,8 @@ begin
         'transaction_item_facets',
         'nutrition_lookups',
         'email_ingestion_log'
+        , 'product_review_decisions'
+        , 'product_correction_events'
     ]
     loop
         if to_regclass(format('public.%I', table_name)) is not null then

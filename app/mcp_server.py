@@ -93,6 +93,14 @@ from app.plugin_models import (
     WidgetView,
 )
 from app.principal import SingleUserPrincipalResolver
+from app.product_review import (
+    ProductReviewRepository,
+    ReviewDecisionRequest,
+    ReviewDecisionResult,
+    ReviewPreview,
+    ReviewPreviewRequest,
+    ReviewReverseRequest,
+)
 from app.receipt_commit import ReceiptCommitSaga
 from app.receipt_downloads import RemoteReceiptDownloader
 from app.receipt_extraction import ReceiptCommitRequest, ReceiptCommitResult
@@ -585,6 +593,92 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
         return _safe(action)
 
     @server.tool(
+        title="Get product review queue",
+        description=("Use this when the owner wants to review uncertain product matches or measurements. "
+                     "Returns owner-scoped evidence issues, source text, reasons and priority."),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                    idempotentHint=True, openWorldHint=False),
+    )
+    def get_product_review_queue(limit: int = 50, include_suppressed: bool = False) -> list[dict[str, Any]]:
+        def action() -> list[dict[str, Any]]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ProductReviewRepository(conn, principal.user_id).queue(
+                    limit=max(1, min(limit, 100)), include_suppressed=include_suppressed
+                )
+        return _safe(action)
+
+    @server.tool(
+        title="List product corrections",
+        description=("Use this when the owner wants to reopen correction history after leaving the review screen. "
+                     "Lists current owner items with correction events, including resolved items."),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                    idempotentHint=True, openWorldHint=False),
+    )
+    def list_product_corrections(limit: int = 50) -> list[dict[str, Any]]:
+        def action() -> list[dict[str, Any]]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ProductReviewRepository(conn, principal.user_id).recent_corrections(limit=limit)
+        return _safe(action)
+
+    @server.tool(
+        title="Get product correction history",
+        description=("Use this when inspecting a reviewed item's correction history. "
+                     "Returns owner-scoped events and reversal state."),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                    idempotentHint=True, openWorldHint=False),
+    )
+    def get_product_correction_history(item_id: UUID) -> list[dict[str, Any]]:
+        def action() -> list[dict[str, Any]]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ProductReviewRepository(conn, principal.user_id).history(item_id)
+        return _safe(action)
+
+    @server.tool(
+        title="Preview product correction",
+        description=("Use this when preparing a product correction before confirmation. "
+                     "Shows exact owner-scoped records, revisions and before/after values."),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                    idempotentHint=True, openWorldHint=False),
+    )
+    def preview_product_correction(request: ReviewPreviewRequest) -> ReviewPreview:
+        def action() -> ReviewPreview:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ProductReviewRepository(conn, principal.user_id).preview(request)
+        return _safe(action)
+
+    @server.tool(
+        title="Decide product review",
+        description=("Use this when the owner has inspected the evidence and preview. "
+                     "Confirm, reject or defer the reviewed revision with a stable operation ID."),
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                    idempotentHint=True, openWorldHint=False),
+    )
+    def decide_product_review(request: ReviewDecisionRequest) -> ReviewDecisionResult:
+        def action() -> ReviewDecisionResult:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ProductReviewRepository(conn, principal.user_id).decide(request)
+        return _safe(action)
+
+    @server.tool(
+        title="Reverse product correction",
+        description=("Use this when the owner wants to undo a correction. "
+                     "Reversal succeeds only while the reviewed item remains unchanged."),
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                    idempotentHint=True, openWorldHint=False),
+    )
+    def reverse_product_correction(request: ReviewReverseRequest) -> ReviewDecisionResult:
+        def action() -> ReviewDecisionResult:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ProductReviewRepository(conn, principal.user_id).reverse(request)
+        return _safe(action)
+
+    @server.tool(
         title="Search known items",
         description=(
             "Use this when finalizing normalized_name/brand on a repeat-staple grocery or household receipt "
@@ -614,10 +708,9 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
         title="Get personal basket index",
         description=(
             "Use this when the owner wants to know whether their own repeat grocery purchases are costing more "
-            "over time. Compares exact products (same name, brand, unit, AND store - never blended varieties "
-            "like Price Watch, and never blended across merchants either, since the same product can be "
-            "priced differently store to store), weighted by recent spend, with sample size and coverage "
-            "always included."
+            "over time. Compares only user-confirmed exact product identities with verified measurement "
+            "evidence, including repeat purchases across merchants. Results include eligible and excluded "
+            "coverage, sample size, and exclusion reasons."
         ),
         annotations=ToolAnnotations(
             readOnlyHint=True,

@@ -75,6 +75,7 @@ describe("draft helpers", () => {
     expect(draft.deposit).toBe("1.00");
     expect(draft.rounding).toBe("-0.01");
     expect(draft.items[0]!.unitPrice).toBe("5.00");
+    expect(draft.items[0]!.existingItemId).toBe("item-1");
     expect(draft.adjustments[0]).toEqual({
       itemIndex: undefined,
       type: "tip",
@@ -133,5 +134,67 @@ describe("draft helpers", () => {
         },
       ],
     });
+  });
+
+  it("keeps unchanged evidence and drops evidence for edited measurements", () => {
+    const item = {
+      ...emptyItem("groceries.grains.flour.corn"),
+      name: "Corn flour",
+      quantity: "1",
+      packageValue: "500",
+      packageUnit: "g",
+      lineTotal: "3.00",
+      existingEvidence: {
+        name: "Corn flour", brand: "", categorySlug: "groceries.grains.flour.corn",
+        quantity: "1", unit: "each", measuredValue: "", measuredUnit: "",
+        packageValue: "500", packageUnit: "g",
+        unitPrice: "", unitPriceBasisValue: "", unitPriceBasisUnit: "", lineTotal: "3.00",
+        productIdentityKey: "corn-flour-500g", productTypeKey: "corn-flour",
+        fieldProvenance: {
+          identity: { source: "user_confirmed" },
+          package_size: { source: "estimate" },
+          package_count: { source: "user_confirmed" },
+        },
+      },
+    };
+    const form = { ...emptyDraft(), total: "3.00", items: [item] };
+    const first = (savePayload(form, "one").draft as { items: Record<string, unknown>[] }).items[0]!;
+    expect(first.product_identity_key).toBe("corn-flour-500g");
+    expect(first.field_provenance).toMatchObject({ package_size: { source: "estimate" } });
+    item.packageValue = "750";
+    const second = (savePayload(form, "two").draft as { items: Record<string, unknown>[] }).items[0]!;
+    expect(second.product_identity_key).toBeUndefined();
+    expect(second.field_provenance).toEqual({});
+  });
+
+  it("drops stale measurement evidence when the printed price basis changes", () => {
+    const item = {
+      ...emptyItem("food_dining.groceries.produce.fruit.apples_pears.apples"),
+      name: "Apples", quantity: "1", unit: "each", unitPrice: "5",
+      unitPriceBasisValue: "1", unitPriceBasisUnit: "kg", lineTotal: "5",
+      existingEvidence: {
+        name: "Apples", brand: "", categorySlug: "food_dining.groceries.produce.fruit.apples_pears.apples",
+        quantity: "1", unit: "each", measuredValue: "", measuredUnit: "",
+        packageValue: "", packageUnit: "",
+        unitPrice: "5", unitPriceBasisValue: "1", unitPriceBasisUnit: "kg", lineTotal: "5",
+        productIdentityKey: "apples", productTypeKey: "apple.honeycrisp",
+        fieldProvenance: { identity: { source: "user_confirmed" },
+          measured_value: { source: "user_confirmed" } },
+      },
+    };
+    item.unitPriceBasisValue = "2";
+    const fields = (savePayload({ ...emptyDraft(), total: "5", items: [item] }, "changed").draft as {
+      items: Record<string, unknown>[]
+    }).items[0]!;
+    expect(fields.field_provenance).toEqual({ identity: { source: "user_confirmed" } });
+  });
+
+  it("sends stable item IDs when lines are reordered or inserted", () => {
+    const apple = { ...emptyItem("groceries"), existingItemId: "apple-id", name: "Apples", lineTotal: "1" };
+    const pear = { ...emptyItem("groceries"), existingItemId: "pear-id", name: "Pears", lineTotal: "1" };
+    const orange = { ...emptyItem("groceries"), name: "Oranges", lineTotal: "1" };
+    const draft = { ...emptyDraft(), total: "3", items: [pear, orange, apple] };
+    const items = (savePayload(draft, "reordered").draft as { items: Record<string, unknown>[] }).items;
+    expect(items.map((item) => item.existing_item_id)).toEqual(["pear-id", undefined, "apple-id"]);
   });
 });

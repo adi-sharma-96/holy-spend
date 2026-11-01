@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.product_evidence import ItemEvidence
+
 
 class TransactionStatus(StrEnum):
     DRAFT = "draft"
@@ -321,6 +323,9 @@ class TransactionItemBase(BaseModel):
     )
     concept_id: UUID | None = None
     variant_id: UUID | None = None
+    product_identity_key: str | None = Field(default=None, max_length=200)
+    product_type_key: str | None = Field(default=None, max_length=200)
+    field_provenance: ItemEvidence = Field(default_factory=ItemEvidence)
     taxonomy_node_key: str | None = None
     category_slug: str | None = None
     facet_value_keys: list[str] = Field(default_factory=list)
@@ -366,7 +371,9 @@ class TransactionItemBase(BaseModel):
 
 
 class TransactionItemCreate(TransactionItemBase):
-    pass
+    # Only used to correlate an item during a confirmed-expense replacement.
+    # It is never inserted as the new row's ID.
+    existing_item_id: UUID | None = None
 
 
 class TransactionItemUpdate(BaseModel):
@@ -376,6 +383,9 @@ class TransactionItemUpdate(BaseModel):
     brand: str | None = None
     concept_id: UUID | None = None
     variant_id: UUID | None = None
+    product_identity_key: str | None = Field(default=None, max_length=200)
+    product_type_key: str | None = Field(default=None, max_length=200)
+    field_provenance: ItemEvidence | None = None
     category_slug: str | None = None
     taxonomy_node_key: str | None = None
     facet_value_keys: list[str] | None = None
@@ -529,6 +539,10 @@ class TransactionItem(BaseModel):
     normalized_name: str | None
     concept_id: UUID | None = None
     variant_id: UUID | None = None
+    product_identity_key: str | None = None
+    product_type_key: str | None = None
+    field_provenance: ItemEvidence = Field(default_factory=ItemEvidence)
+    evidence_revision: int = 1
     concept_name: str | None = None
     variant_name: str | None = None
     brand: str | None = None

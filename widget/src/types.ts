@@ -31,6 +31,9 @@ export type ExpenseItem = {
   variant_id?: string | null;
   concept_name?: string | null;
   variant_name?: string | null;
+  product_identity_key?: string | null;
+  product_type_key?: string | null;
+  field_provenance?: Record<string, unknown>;
   brand?: string | null;
   size_text?: string | null;
   category_slug?: string | null;

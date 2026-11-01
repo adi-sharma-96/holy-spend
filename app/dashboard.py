@@ -10,6 +10,7 @@ from app.personal_basket import exact_basket_identity
 from app.plugin_models import (
     BasketProduct,
     CategorySpend,
+    ComparisonCoverage,
     CurrencySpend,
     DailySpend,
     DashboardInsight,
@@ -33,6 +34,7 @@ from app.plugin_models import (
     SpendTrendPoint,
 )
 from app.price_watch import TRACKABLE_PREFIXES, canonical_price_watch_identity
+from app.product_evidence import decide_comparison, readiness_reasons
 
 PERCENT_QUANTUM = Decimal("0.1")
 BASKET_WINDOW_DAYS = 180
@@ -44,6 +46,18 @@ BASKET_TREND_SAMPLE_SIZE = 3
 
 def _decimal(value: Any) -> Decimal:
     return Decimal(str(value or 0))
+
+
+def _add_coverage(coverage: ComparisonCoverage, row: Any, reasons: tuple[str, ...]) -> None:
+    spend = abs(_decimal(row.get("line_total_amount") or 0))
+    if reasons:
+        coverage.excluded_items += 1
+        coverage.excluded_spend += spend
+        for reason in reasons:
+            coverage.reasons[reason] = coverage.reasons.get(reason, 0) + 1
+    else:
+        coverage.eligible_items += 1
+        coverage.eligible_spend += spend
 
 
 def _quantity_label(row: Any) -> str | None:
@@ -131,6 +145,7 @@ class DashboardRepository:
         self.user_id = user_id
         self.today = today
         self.fallback_currency = fallback_currency
+        self.price_coverage = ComparisonCoverage()
 
     def get_dashboard(self, request: ExpenseDashboardRequest) -> ExpenseDashboard:
         window = dashboard_window(request.period, self.today())
@@ -474,6 +489,7 @@ class DashboardRepository:
             recent_transactions=recent,
             needs_review_count=needs_review_count,
             price_changes=price_changes,
+            price_coverage=self.price_coverage,
         )
 
     def get_merchant_breakdown(self, request: MerchantBreakdownRequest) -> MerchantBreakdownResponse:
@@ -574,7 +590,12 @@ class DashboardRepository:
                    coalesce(t.merchant_name_normalized, t.merchant_name_raw) as merchant,
                    i.quantity, i.unit, i.measured_value, i.measured_unit,
                    i.package_value, i.package_unit,
-                   i.updated_at, i.id
+                   i.updated_at, i.id, i.product_identity_key, i.product_type_key,
+                   i.field_provenance, i.classification_review_status, i.normalized_price_is_estimated,
+                   i.unit_price_amount, i.unit_price_basis_value,
+                   i.line_total_amount,
+                   exists(select 1 from transaction_adjustments a
+                          where a.item_id = i.id and a.type = 'refund') as has_refund
             from transaction_items i
             join transactions t on t.id = i.transaction_id and t.user_id = i.user_id
             left join taxonomy_nodes node on node.id = i.taxonomy_node_id
@@ -582,14 +603,13 @@ class DashboardRepository:
               and t.status = 'confirmed'
               and t.transaction_type = 'expense'
               and t.transaction_date <= %(current_end)s
-              and i.normalized_unit_price_amount is not null
-              and not i.normalized_price_is_estimated
-              and i.normalized_name is not null
+              and node.stable_key like any(%(trackable_prefixes)s)
             order by t.transaction_date desc, i.updated_at desc, i.id desc
             """,
             {
                 "user_id": self.user_id,
                 "current_end": window.current_end,
+                "trackable_prefixes": [f"{prefix}%" for prefix in TRACKABLE_PREFIXES],
             },
         ).fetchall()
 
@@ -603,11 +623,22 @@ class DashboardRepository:
                 row["taxonomy_name"],
                 row["normalized_unit"],
             )
+            reasons = readiness_reasons(row)
             if identity is None:
+                reasons = (*reasons, "unsupported_product_class")
+            if reasons:
+                _add_coverage(self.price_coverage, row, tuple(dict.fromkeys(reasons)))
                 continue
-            labels[identity.key] = identity.label
-            taxonomy_keys.setdefault(identity.key, row["taxonomy_key"])
-            grouped[(identity.key, row["currency"], row["normalized_unit"])].append(row)
+            assert identity is not None
+            exact_key = f"product:{row['product_identity_key']}"
+            labels[exact_key] = identity.label
+            taxonomy_keys.setdefault(exact_key, row["taxonomy_key"])
+            group = grouped[(exact_key, row["currency"], row["normalized_unit"])]
+            if not group or decide_comparison(group[0], row).eligible:
+                group.append(row)
+                _add_coverage(self.price_coverage, row, ())
+            else:
+                _add_coverage(self.price_coverage, row, decide_comparison(group[0], row).reasons)
 
         changes: list[PriceChange] = []
         for (identity_key, currency, normalized_unit), product_rows in grouped.items():
@@ -699,9 +730,8 @@ class DashboardRepository:
         return changes[:limit]
 
     def get_personal_basket(self, request: PersonalBasketRequest) -> PersonalBasketIndex:
-        """A personal cost-of-living index, deliberately separate from Price
-        Watch's family-level grouping (see app/personal_basket.py). For each
-        *exact* product bought at least twice within a 180-day window,
+        """A cost-of-living index for reviewed exact products. For each
+        confirmed identity bought at least twice within a 180-day window,
         compares the average of its earliest purchases against the average
         of its most recent ones (up to BASKET_TREND_SAMPLE_SIZE each side,
         degrading to a plain earliest-vs-latest comparison when only two
@@ -717,6 +747,7 @@ class DashboardRepository:
             "currency": request.currency,
             "window_start": window_start,
             "window_end": window_end,
+            "trackable_prefixes": [f"{prefix}%" for prefix in TRACKABLE_PREFIXES],
         }
         total_row = self.conn.execute(
             """
@@ -746,7 +777,13 @@ class DashboardRepository:
             select i.normalized_name, i.brand, node.stable_key as taxonomy_key,
                    i.normalized_unit, i.normalized_unit_price_amount as price,
                    i.line_total_amount, t.transaction_date,
-                   coalesce(t.merchant_name_normalized, t.merchant_name_raw) as merchant
+                   coalesce(t.merchant_name_normalized, t.merchant_name_raw) as merchant,
+                   t.currency, i.product_identity_key, i.product_type_key,
+                   i.field_provenance, i.classification_review_status, i.normalized_price_is_estimated,
+                   i.unit_price_amount, i.unit_price_basis_value,
+                   i.quantity, i.measured_value, i.package_value,
+                   exists(select 1 from transaction_adjustments a
+                          where a.item_id = i.id and a.type = 'refund') as has_refund
             from transaction_items i
             join transactions t on t.id = i.transaction_id and t.user_id = i.user_id
             left join taxonomy_nodes node on node.id = i.taxonomy_node_id
@@ -756,9 +793,7 @@ class DashboardRepository:
               and t.currency = %(currency)s
               and t.transaction_date >= %(window_start)s
               and t.transaction_date <= %(window_end)s
-              and i.normalized_unit_price_amount is not null
-              and not i.normalized_price_is_estimated
-              and i.normalized_name is not null
+              and node.stable_key like any(%(trackable_prefixes)s)
             order by t.transaction_date asc
             """,
             query_params,
@@ -766,6 +801,7 @@ class DashboardRepository:
 
         grouped: dict[str, list[Any]] = defaultdict(list)
         labels: dict[str, str] = {}
+        comparison_coverage = ComparisonCoverage()
         for row in rows:
             identity = exact_basket_identity(
                 row["normalized_name"],
@@ -774,10 +810,21 @@ class DashboardRepository:
                 row["normalized_unit"],
                 row["merchant"],
             )
+            reasons = readiness_reasons(row)
             if identity is None:
+                reasons = (*reasons, "unsupported_product_class")
+            if reasons:
+                _add_coverage(comparison_coverage, row, tuple(dict.fromkeys(reasons)))
                 continue
-            labels[identity.key] = identity.label
-            grouped[identity.key].append(row)
+            assert identity is not None
+            exact_key = f"{row['product_identity_key']}@{row['normalized_unit']}"
+            labels[exact_key] = identity.label
+            group = grouped[exact_key]
+            if not group or decide_comparison(group[0], row).eligible:
+                group.append(row)
+                _add_coverage(comparison_coverage, row, ())
+            else:
+                _add_coverage(comparison_coverage, row, decide_comparison(group[0], row).reasons)
 
         products: list[BasketProduct] = []
         for identity_key, item_rows in grouped.items():
@@ -859,6 +906,7 @@ class DashboardRepository:
             coverage_percent=coverage_percent,
             confidence=confidence,
             products=products,
+            comparison_coverage=comparison_coverage,
         )
 
     @staticmethod
@@ -955,9 +1003,15 @@ class DashboardRepository:
                        i.raw_name
                    ) as display_name,
                    t.currency, i.normalized_unit, i.normalized_unit_price_amount,
+                   i.normalized_price_is_estimated,
                    i.normalized_price_is_estimated as is_estimated,
                    i.quantity, i.unit, i.measured_value, i.measured_unit,
-                   i.package_value, i.package_unit, i.line_total_amount
+                   i.package_value, i.package_unit, i.line_total_amount,
+                   i.product_identity_key, i.product_type_key, i.field_provenance,
+                   i.classification_review_status,
+                   i.unit_price_amount, i.unit_price_basis_value,
+                   exists(select 1 from transaction_adjustments a
+                          where a.item_id = i.id and a.type = 'refund') as has_refund
             from transaction_items i
             join transactions t on t.id = i.transaction_id and t.user_id = i.user_id
             left join product_concepts pc on pc.id = i.concept_id
@@ -966,7 +1020,6 @@ class DashboardRepository:
             where i.user_id = %(user_id)s
               and t.status = 'confirmed'
               and t.transaction_type = 'expense'
-              and i.normalized_unit_price_amount is not null
               {currency_condition}
             order by t.transaction_date desc, i.updated_at desc, i.id desc
             """,
@@ -988,19 +1041,14 @@ class DashboardRepository:
                 ) or (
                     identity_type == "concept" and row["concept_id"] == identity_uuid
                 )
-                if not matches:
+                if not matches or readiness_reasons(row):
                     continue
-                canonical = canonical_price_watch_identity(
-                    row["normalized_name"],
-                    row["taxonomy_key"],
-                    row["taxonomy_name"],
-                    row["normalized_unit"],
-                )
-                target_product_key = canonical.key.removeprefix("product:") if canonical else None
+                target_product_key = row["product_identity_key"]
                 break
 
-        selected_rows = []
+        selected_rows: list[dict[str, Any]] = []
         product_label: str | None = None
+        comparison_coverage = ComparisonCoverage()
         for row in rows:
             canonical = canonical_price_watch_identity(
                 row["normalized_name"],
@@ -1008,8 +1056,7 @@ class DashboardRepository:
                 row["taxonomy_name"],
                 row["normalized_unit"],
             )
-            # "basket" is a separate, exact identity that must never fall back
-            # to Price Watch's blended family match (see app/personal_basket.py).
+            # Basket and Price Watch both require the same confirmed identity.
             basket_identity = exact_basket_identity(
                 row["normalized_name"],
                 row["brand"],
@@ -1018,29 +1065,26 @@ class DashboardRepository:
                 row["merchant_name"],
             )
             matches_product = (
-                canonical is not None
-                and target_product_key is not None
-                and canonical.key == f"product:{target_product_key}"
-            )
-            matches_exact = (
-                target_product_key is None
-                and identity_type in {"name", "variant", "concept"}
-                and (
-                    (
-                        identity_type == "name"
-                        and str(row["normalized_name"] or "").strip().lower()
-                        == identity_value.strip().lower()
-                    )
-                    or (identity_type == "variant" and row["variant_id"] == identity_uuid)
-                    or (identity_type == "concept" and row["concept_id"] == identity_uuid)
-                )
+                target_product_key is not None
+                and row["product_identity_key"] == target_product_key
             )
             matches_basket = (
                 identity_type == "basket"
-                and basket_identity is not None
-                and basket_identity.key == identity_value
+                and f"{row['product_identity_key']}@{row['normalized_unit']}" == identity_value
             )
-            if not (matches_product or matches_exact or matches_basket):
+            matches_requested_name = (
+                target_product_key is None
+                and identity_type in {"name", "variant", "concept"}
+                and ((identity_type == "name" and str(row["normalized_name"] or "").strip().lower()
+                      == identity_value.strip().lower())
+                     or (identity_type == "variant" and row["variant_id"] == identity_uuid)
+                     or (identity_type == "concept" and row["concept_id"] == identity_uuid))
+            )
+            if not (matches_product or matches_basket or matches_requested_name):
+                continue
+            reasons = readiness_reasons(row)
+            if reasons:
+                _add_coverage(comparison_coverage, row, reasons)
                 continue
             if request.normalized_unit is not None and str(
                 row["normalized_unit"] or ""
@@ -1051,12 +1095,19 @@ class DashboardRepository:
                 # unit's series happens to be returned first, regardless of
                 # which card was actually clicked.
                 continue
+            same_basis = next((prior for prior in selected_rows
+                               if prior["currency"] == row["currency"]
+                               and prior["normalized_unit"] == row["normalized_unit"]), None)
+            if same_basis is not None and not decide_comparison(same_basis, row).eligible:
+                _add_coverage(comparison_coverage, row, decide_comparison(same_basis, row).reasons)
+                continue
             if identity_type == "basket":
                 if basket_identity is not None:
                     product_label = basket_identity.label
             elif canonical is not None:
                 product_label = canonical.label
             selected_rows.append(row)
+            _add_coverage(comparison_coverage, row, ())
             if len(selected_rows) >= request.limit:
                 break
 
@@ -1069,7 +1120,8 @@ class DashboardRepository:
             for (currency, unit), series_points in sorted(grouped.items())
         ]
         label = product_label or (points[0].display_name if points else identity_value)
-        return ItemPriceHistory(identity_key=request.identity_key, label=label, series=series)
+        return ItemPriceHistory(identity_key=request.identity_key, label=label, series=series,
+                                comparison_coverage=comparison_coverage)
 
     def search_known_items(self, request: SearchKnownItemsRequest) -> SearchKnownItemsResponse:
         # get_item_price_history's "name" identity match is an exact,

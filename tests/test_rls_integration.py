@@ -292,14 +292,20 @@ def test_aliases_are_learned_on_confirmation_not_draft(
     category_id = admin_conn.execute(
         "select id from categories where slug = 'grocery.food.dairy_eggs_alternatives.milk'",
     ).fetchone()["id"]
+    taxonomy_node_id = admin_conn.execute(
+        "select id from taxonomy_nodes where stable_key = "
+        "'food_dining.groceries.dairy_eggs.milk.cows_milk.fresh_milk'"
+    ).fetchone()["id"]
     admin_conn.execute(
         """
         insert into transaction_items (
-            user_id, transaction_id, raw_name, category_id, line_total_amount
+            user_id, transaction_id, raw_name, category_id, taxonomy_node_id, line_total_amount
         )
-        values (%(user_id)s, %(transaction_id)s, 'TEST MILK', %(category_id)s, 11.00)
+        values (%(user_id)s, %(transaction_id)s, 'TEST MILK', %(category_id)s,
+                %(taxonomy_node_id)s, 11.00)
         """,
-        {"user_id": USER_A, "transaction_id": tx_a, "category_id": category_id},
+        {"user_id": USER_A, "transaction_id": tx_a, "category_id": category_id,
+         "taxonomy_node_id": taxonomy_node_id},
     )
     admin_conn.commit()
 
@@ -409,7 +415,7 @@ def test_runtime_role_can_insert_own_oauth_refresh_token_but_not_for_another_use
     pat_id = admin_conn.execute(
         """
         insert into personal_access_tokens (user_id, token_hash, name, scopes)
-        values (%(user_id)s, 'b' * 64, 'integration test oauth pat', array['taxonomy:read'])
+        values (%(user_id)s, repeat('b', 64), 'integration test oauth pat', array['taxonomy:read'])
         returning id
         """,
         {"user_id": USER_A},
@@ -421,7 +427,7 @@ def test_runtime_role_can_insert_own_oauth_refresh_token_but_not_for_another_use
         runtime_conn.execute(
             """
             insert into oauth_refresh_tokens (user_id, token_hash, pat_token_id, expires_at)
-            values (%(user_id)s, 'c' * 64, %(pat_id)s, now() + interval '1 day')
+            values (%(user_id)s, repeat('c', 64), %(pat_id)s, now() + interval '1 day')
             """,
             {"user_id": USER_A, "pat_id": pat_id},
         )
@@ -431,7 +437,7 @@ def test_runtime_role_can_insert_own_oauth_refresh_token_but_not_for_another_use
         runtime_conn.execute(
             """
             insert into oauth_refresh_tokens (user_id, token_hash, pat_token_id, expires_at)
-            values (%(user_id)s, 'd' * 64, %(pat_id)s, now() + interval '1 day')
+            values (%(user_id)s, repeat('d', 64), %(pat_id)s, now() + interval '1 day')
             """,
             {"user_id": USER_B, "pat_id": pat_id},
         )
@@ -446,7 +452,7 @@ def test_revoked_oauth_refresh_token_cannot_authenticate(
     pat_id = admin_conn.execute(
         """
         insert into personal_access_tokens (user_id, token_hash, name, scopes)
-        values (%(user_id)s, 'e' * 64, 'integration test oauth pat', array['taxonomy:read'])
+        values (%(user_id)s, repeat('e', 64), 'integration test oauth pat', array['taxonomy:read'])
         returning id
         """,
         {"user_id": USER_A},

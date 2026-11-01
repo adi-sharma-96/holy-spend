@@ -35,6 +35,7 @@ from app.models import (
     ValidationIssue,
 )
 from app.normalization import normalize_lookup_text
+from app.product_evidence import ItemEvidence, invalidate_edited_evidence
 
 PRICE_INPUT_FIELDS = {
     "quantity",
@@ -709,6 +710,25 @@ class TransactionRepository:
         if status != TransactionStatus.CONFIRMED:
             raise ConflictError("Only confirmed expenses can be replaced through corrections")
         current = self.get_transaction(transaction_id)
+        prior_by_id = {item.id: item for item in current.items}
+        used_prior_ids: set[UUID] = set()
+        replacement_items: list[TransactionItemCreate] = []
+        for item in payload.items:
+            prior_id = item.existing_item_id
+            if prior_id is not None:
+                if prior_id not in prior_by_id or prior_id in used_prior_ids:
+                    raise ValidationReferenceError("Replacement item ID is not unique in this expense")
+                used_prior_ids.add(prior_id)
+                prior = prior_by_id[prior_id]
+                evidence = invalidate_edited_evidence(
+                    prior, item.model_dump(exclude={"field_provenance", "existing_item_id"}),
+                    item.field_provenance if "field_provenance" in item.model_fields_set else None,
+                ) or prior.field_provenance
+            else:
+                # New lines have no reviewed predecessor. Supplied evidence
+                # cannot borrow a label or source reference from another line.
+                evidence = ItemEvidence()
+            replacement_items.append(item.model_copy(update={"field_provenance": evidence}))
         self.add_correction(
             transaction_id,
             None,
@@ -806,7 +826,7 @@ class TransactionRepository:
             """,
             {"transaction_id": transaction_id, "user_id": self.user_id},
         )
-        for item in payload.items:
+        for item in replacement_items:
             self.add_item(transaction_id, item)
 
         self.clear_validation_issues(transaction_id)
@@ -918,7 +938,8 @@ class TransactionRepository:
             """
             insert into transaction_items (
                 user_id, transaction_id, raw_name, interpreted_name, normalized_name, brand,
-                concept_id, variant_id, category_id, taxonomy_node_id,
+                concept_id, variant_id, product_identity_key, product_type_key,
+                field_provenance, category_id, taxonomy_node_id,
                 item_role, classification_source, classification_confidence,
                 classification_review_status, classification_reviewed_at,
                 quantity, unit,
@@ -931,7 +952,8 @@ class TransactionRepository:
             )
             values (
                 %(user_id)s, %(transaction_id)s, %(raw_name)s, %(interpreted_name)s,
-                %(normalized_name)s, %(brand)s, %(concept_id)s, %(variant_id)s, %(category_id)s,
+                %(normalized_name)s, %(brand)s, %(concept_id)s, %(variant_id)s,
+                %(product_identity_key)s, %(product_type_key)s, %(field_provenance)s, %(category_id)s,
                 %(taxonomy_node_id)s, %(item_role)s, %(classification_source)s,
                 %(classification_confidence)s, %(classification_review_status)s,
                 %(classification_reviewed_at)s,
@@ -955,6 +977,9 @@ class TransactionRepository:
                 "brand": payload.brand,
                 "concept_id": concept_id,
                 "variant_id": variant_id,
+                "product_identity_key": payload.product_identity_key,
+                "product_type_key": payload.product_type_key,
+                "field_provenance": Jsonb(payload.field_provenance.model_dump(mode="json")),
                 "category_id": category_id,
                 "taxonomy_node_id": taxonomy_node_id,
                 "item_role": payload.item_role.value,
@@ -1019,6 +1044,8 @@ class TransactionRepository:
                 "correction_reason",
             },
         )
+        provenance_supplied = "field_provenance" in updates
+        updates.pop("field_provenance", None)
         for enum_field in {
             "item_role",
             "classification_source",
@@ -1050,6 +1077,12 @@ class TransactionRepository:
             updates["category_id"] = TaxonomyRepository(self.conn).legacy_category_id_for_node(
                 taxonomy_node_id
             )
+        evidence = invalidate_edited_evidence(
+            current, updates,
+            (payload.field_provenance or ItemEvidence()) if provenance_supplied else None,
+        )
+        if evidence is not None:
+            updates["field_provenance"] = Jsonb(evidence.model_dump(mode="json"))
         if PRICE_INPUT_FIELDS & updates.keys():
             merged = current.model_copy(update=updates)
             updates.update(_normalized_price_fields(merged))
@@ -1538,7 +1571,8 @@ class TransactionRepository:
                    ), '[]'::jsonb) as taxonomy_path,
                    i.item_role, i.classification_source, i.classification_confidence,
                    i.classification_review_status, i.classification_reviewed_at,
-                   i.quantity, i.unit,
+                   i.product_identity_key, i.product_type_key, i.field_provenance,
+                   i.evidence_revision, i.quantity, i.unit,
                    i.measured_value, i.measured_unit, i.package_value, i.package_unit,
                    i.unit_price_amount, i.unit_price_basis_value, i.unit_price_basis_unit,
                    i.normalized_unit, i.normalized_unit_price_amount,

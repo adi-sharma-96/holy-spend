@@ -171,6 +171,7 @@ or Codex at this repo per "Extending it" above.
 - Architecture and how the pieces fit together: [docs/architecture.md](docs/architecture.md)
 - Security model: [docs/security.md](docs/security.md)
 - Taxonomy v2, the classification system behind Price Watch, Nutrition, and every category: [docs/taxonomy-v2.md](docs/taxonomy-v2.md)
+- Product comparisons require confirmed identity and measurement evidence; the widget's **Fix matches** screen lets you review uncertain products, preview corrections, and reverse a correction while its reviewed revision is current.
 - Receipt storage and lifecycle: [docs/supabase-storage.md](docs/supabase-storage.md), [docs/analyze-before-commit-receipts.md](docs/analyze-before-commit-receipts.md)
 
 ## License

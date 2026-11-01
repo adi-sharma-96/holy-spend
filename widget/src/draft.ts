@@ -1,6 +1,7 @@
 import type { ExpenseSnapshot, ExpenseTransaction } from "./types";
 
 export type DraftItem = {
+  existingItemId?: string;
   name: string;
   brand: string;
   categorySlug: string;
@@ -14,6 +15,24 @@ export type DraftItem = {
   unitPriceBasisValue: string;
   unitPriceBasisUnit: string;
   lineTotal: string;
+  existingEvidence?: {
+    name: string;
+    brand: string;
+    categorySlug: string;
+    quantity: string;
+    unit: string;
+    measuredValue: string;
+    measuredUnit: string;
+    packageValue: string;
+    packageUnit: string;
+    unitPrice: string;
+    unitPriceBasisValue: string;
+    unitPriceBasisUnit: string;
+    lineTotal: string;
+    productIdentityKey?: string | null;
+    productTypeKey?: string | null;
+    fieldProvenance?: Record<string, unknown>;
+  };
 };
 
 export type DraftForm = {
@@ -113,6 +132,7 @@ export function draftFromSnapshot(snapshot: ExpenseSnapshot): DraftForm {
     rounding: text(transaction.rounding_amount),
     total: text(transaction.total_amount),
     items: (transaction.items || []).map((item) => ({
+      existingItemId: item.id,
       name: item.raw_name || item.interpreted_name || item.normalized_name || "",
       brand: item.brand || "",
       categorySlug: item.taxonomy_node_key || item.category_slug || "",
@@ -126,6 +146,24 @@ export function draftFromSnapshot(snapshot: ExpenseSnapshot): DraftForm {
       unitPriceBasisValue: text(item.unit_price_basis_value),
       unitPriceBasisUnit: item.unit_price_basis_unit || "",
       lineTotal: text(item.line_total_amount),
+      existingEvidence: {
+        name: item.raw_name || item.interpreted_name || item.normalized_name || "",
+        brand: item.brand || "",
+        categorySlug: item.taxonomy_node_key || item.category_slug || "",
+        quantity: text(item.quantity),
+        unit: item.unit || "",
+        measuredValue: text(item.measured_value),
+        measuredUnit: item.measured_unit || "",
+        packageValue: text(item.package_value),
+        packageUnit: item.package_unit || "",
+        unitPrice: text(item.unit_price_amount),
+        unitPriceBasisValue: text(item.unit_price_basis_value),
+        unitPriceBasisUnit: item.unit_price_basis_unit || "",
+        lineTotal: text(item.line_total_amount),
+        productIdentityKey: item.product_identity_key,
+        productTypeKey: item.product_type_key,
+        fieldProvenance: item.field_provenance,
+      },
     })),
     adjustments: (transaction.adjustments || []).map((adjustment) => ({
       itemIndex: adjustment.item_id
@@ -161,6 +199,7 @@ export function draftFromEditableDraft(value: Record<string, unknown>): DraftFor
     rounding: text(value.rounding_amount),
     total: text(value.total_amount),
     items: items.map((item) => ({
+      existingItemId: text(item.existing_item_id) || undefined,
       name: text(item.raw_name || item.interpreted_name || item.normalized_name),
       brand: text(item.brand),
       categorySlug:
@@ -198,6 +237,53 @@ function optionalValue(value: string): string | undefined {
   return candidate ? candidate : undefined;
 }
 
+function preservedEvidence(item: DraftItem): Record<string, unknown> {
+  const original = item.existingEvidence;
+  if (!original) return {};
+  const sameProduct = item.name === original.name
+    && item.brand === original.brand
+    && item.categorySlug === original.categorySlug
+    && item.quantity === original.quantity
+    && item.unit === original.unit
+    && item.measuredValue === original.measuredValue
+    && item.measuredUnit === original.measuredUnit
+    && item.packageValue === original.packageValue
+    && item.packageUnit === original.packageUnit;
+  const evidence = { ...(original.fieldProvenance || {}) };
+  if (!sameProduct) {
+    delete evidence.identity;
+    delete evidence.product_type;
+    delete evidence.brand;
+  }
+  if (item.quantity !== original.quantity || item.unit !== original.unit) {
+    delete evidence.quantity;
+    delete evidence.package_count;
+  }
+  if (item.measuredValue !== original.measuredValue || item.measuredUnit !== original.measuredUnit) {
+    delete evidence.measured_value;
+  }
+  if (item.packageValue !== original.packageValue || item.packageUnit !== original.packageUnit) {
+    delete evidence.package_size;
+    delete evidence.package_count;
+  }
+  if (item.unitPrice !== original.unitPrice
+    || item.unitPriceBasisValue !== original.unitPriceBasisValue
+    || item.unitPriceBasisUnit !== original.unitPriceBasisUnit) {
+    delete evidence.measured_value;
+  }
+  if (item.lineTotal !== original.lineTotal) {
+    delete evidence.quantity;
+    delete evidence.package_size;
+    delete evidence.package_count;
+    delete evidence.measured_value;
+  }
+  return {
+    product_identity_key: sameProduct ? original.productIdentityKey : undefined,
+    product_type_key: sameProduct ? original.productTypeKey : undefined,
+    field_provenance: evidence,
+  };
+}
+
 export function savePayload(form: DraftForm, clientRequestId: string): Record<string, unknown> {
   return {
     draft: {
@@ -221,6 +307,7 @@ export function savePayload(form: DraftForm, clientRequestId: string): Record<st
       total_amount: form.total,
       receipt: form.receiptId ? {} : undefined,
       items: form.items.map((item) => ({
+        existing_item_id: item.existingItemId,
         raw_name: item.name.trim() || undefined,
         interpreted_name: item.name.trim() || undefined,
         normalized_name: item.name.trim().toLowerCase() || undefined,
@@ -241,6 +328,7 @@ export function savePayload(form: DraftForm, clientRequestId: string): Record<st
         unit_price_basis_value: optionalValue(item.unitPriceBasisValue),
         unit_price_basis_unit: optionalValue(item.unitPriceBasisUnit),
         line_total_amount: item.lineTotal,
+        ...preservedEvidence(item),
       })),
       adjustments: form.adjustments.map((adjustment) => ({
         item_index:

@@ -554,6 +554,15 @@ nodes:
                 children:
                   - key: all_purpose_flour
                     name: All-Purpose Flour
+                  - key: corn_flour
+                    name: Corn Flour
+                    synonyms: [yellow corn flour, maize flour]
+                  - key: ragi_flour
+                    name: Ragi Flour
+                    synonyms: [finger millet flour]
+                  - key: sooji
+                    name: Sooji
+                    synonyms: [semolina, rava]
                   - key: atta
                     name: Atta
                   - key: bread_flour
@@ -569,6 +578,13 @@ nodes:
                   - key: lentils
                     name: Lentils
                     synonyms: [dal, toor dal, masoor dal, moong dal]
+                    children:
+                      - key: urad
+                        name: Urad Dal
+                        synonyms: [urad gota, black gram]
+                      - key: moong
+                        name: Moong Dal
+                        synonyms: [mung beans, green gram]
                   - key: beans
                     name: Beans
                     synonyms: [kidney beans, black beans, navy beans]
@@ -708,6 +724,16 @@ nodes:
             children:
               - key: frozen_produce
                 name: Frozen Produce
+                children:
+                  - key: frozen_berries
+                    name: Frozen Berries
+                    synonyms: [frozen berry blend, frozen mixed berries]
+                  - key: frozen_peas
+                    name: Frozen Peas
+                    synonyms: [frozen green peas]
+                  - key: frozen_coconut
+                    name: Frozen Coconut
+                    synonyms: [frozen shredded coconut]
               - key: frozen_meals
                 name: Frozen Meals
               - key: frozen_protein

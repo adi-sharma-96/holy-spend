@@ -47,6 +47,7 @@ def test_unknown_and_legacy_buckets_never_become_comparison_products() -> None:
 
 def test_upgrade_seeds_the_same_catalog_as_clean_install() -> None:
     migration = (ROOT / "supabase/migrations/0030_specific_fruit_and_yogurt.sql").read_text()
+    migration += (ROOT / "supabase/migrations/0034_specific_grains_and_frozen_produce.sql").read_text()
     catalog = load_catalog(ROOT / "taxonomy/v2/taxonomy.yaml")
     assert catalog.content_hash in migration
     for node in catalog.nodes:

@@ -13,6 +13,7 @@ import {
 import { ExpenseEditor } from "./components/ExpenseEditor";
 import { InlineLauncher } from "./components/InlineLauncher";
 import { Overview } from "./components/Overview";
+import { ProductReviewPanel } from "./components/ProductReviewPanel";
 import { TransactionDetail } from "./components/TransactionDetail";
 import { draftFromSnapshot, emptyDraft, savePayload, type DraftForm } from "./draft";
 import { Icon } from "./icons";
@@ -45,6 +46,7 @@ const ROOT_ROUTES = new Set([
   "/trends",
   "/prices",
   "/nutrition",
+  "/matches",
   "/expenses/new",
 ]);
 
@@ -889,11 +891,7 @@ export function App() {
   }
 
   function openReviewQueue() {
-    setActivityFilter("draft");
-    setTransactions(undefined);
-    setTransactionStatus("idle");
-    navigate("/transactions");
-    void loadTransactions(false, "draft");
+    navigate("/matches");
   }
 
   async function backToActivity() {
@@ -904,6 +902,7 @@ export function App() {
 
   const activeExpenseRoute = expenseRoute(route);
   const isEditor = route === "/expenses/new" || activeExpenseRoute.review;
+  const isMatches = route === "/matches";
   const isDetail = Boolean(activeExpenseRoute.transactionId) && !activeExpenseRoute.review;
   const isRoot =
     route === "/overview" ||
@@ -967,7 +966,7 @@ export function App() {
         .filter(Boolean)
         .join(" ")}
     >
-      {isRoot && (
+      {(isRoot || isMatches) && (
         <header className="app-header">
           <div className="brand-mark"><Icon name="receipt" size={21} /></div>
           <div className="welcome">
@@ -976,6 +975,7 @@ export function App() {
           </div>
           <div className="header-actions">
             {isDemoMode && <span className="preview-chip">Preview</span>}
+            <button className="secondary-button" onClick={openReviewQueue}>Fix matches</button>
             <button className="primary-button add-button" onClick={() => void launchManualEntry()}>
               <Icon name="add" size={17} /> Add expense
             </button>
@@ -992,7 +992,9 @@ export function App() {
         </div>
       )}
 
-      {isRoot ? (
+      {isMatches ? (
+        <ProductReviewPanel onBack={() => navigate("/overview")} />
+      ) : isRoot ? (
         dashboard ? (
           <Overview
             dashboard={dashboard}

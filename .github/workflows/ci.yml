@@ -88,5 +88,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -v expense_app_password=r1-local-test -f supabase/bootstrap/001_runtime_role.sql
       - name: OAuth PostgreSQL integration
         run: pytest tests/test_oauth_code_storage_integration.py
+      - name: Product review and owner isolation PostgreSQL integration
+        run: pytest tests/test_product_review_integration.py tests/test_rls_integration.py
       - name: Local gateway and MCP authentication smoke
         run: bash scripts/ci_auth_smoke.sh
