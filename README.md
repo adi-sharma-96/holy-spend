@@ -176,3 +176,13 @@ or Codex at this repo per "Extending it" above.
 ## License
 
 [MIT](LICENSE)
+
+## PAT verification and pepper rotation
+
+`python -m scripts.manage_pat create` now requires `--verify-url https://your-api.example` (or `PAT_VERIFY_BASE_URL`) and checks the committed token against `/v1/auth/verify`. The explicit flag takes precedence. A saved token is printed once even when the check fails; a nonzero result means it has **not** been verified. Use `--skip-verification` only for offline provisioning: it returns `CREATED_UNVERIFIED` (exit 15). For a local HTTP server, add `--allow-loopback-http`; remote targets require HTTPS. Do not point the CLI at `/mcp`.
+
+Creation requires a non-development `PAT_PEPPER` even when `ENVIRONMENT` defaults to `local`. The default pepper is allowed only with `--allow-development-pepper` and an explicitly selected literal loopback target; local HTTP also requires `--allow-loopback-http`. This exception is for disposable local development only.
+
+To check a previously saved token without database access or a local pepper, run `python -m scripts.manage_pat verify --verify-url https://your-api.example --user-id <UUID> --token-id <UUID>`. The token is entered at a hidden prompt; `--stdin` is available for protected pipelines. Repeat `--scope <SCOPE>` for an exact expected scope set. Without scopes, only identity is checked. Exit codes: `VERIFIED=0`, `AUTH_REJECTED=10`, `IDENTITY_MISMATCH=11`, `VERIFICATION_UNAVAILABLE=12`, `TARGET_INCOMPATIBLE=13`, `VERIFICATION_DENIED=14`, `CREATED_UNVERIFIED=15`, `CONFIGURATION_ERROR=16`. A 401 does not identify the cause; network failure does not imply rejection. Verification proves acceptance at the selected origin, not MCP or host readiness.
+
+`PAT_PEPPER` remains the current hashing secret. An optional previous secret requires all three settings: `PAT_PREVIOUS_PEPPER`, `PAT_PREVIOUS_PEPPER_VERSION`, and a timezone-aware `PAT_PREVIOUS_PEPPER_RETIRE_AT`; label the current key with `PAT_PEPPER_VERSION` (default `v1`). New PAT and OAuth tokens use only the current key. The previous key stops authenticating at the deadline, without a restart. Deploy dual-key-capable code with the old key still current before activating a new current key. Keep both keys available while any new-key tokens may exist; an older single-key revision cannot authenticate them.

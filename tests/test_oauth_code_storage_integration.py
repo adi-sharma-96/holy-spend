@@ -6,11 +6,13 @@ import hashlib
 import os
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from threading import Event
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import UUID
 
+import httpx
 import psycopg
 import pytest
 from fastapi import FastAPI
@@ -21,7 +23,11 @@ from psycopg_pool import ConnectionPool
 from pydantic import AnyUrl, SecretStr
 
 from app import db, oauth_provider
-from app.config import Settings
+from app.config import Settings, get_settings
+from app.main import create_app
+from app.pat_verification import VerifyCode, verify_credential
+from app.security import hash_pat
+from scripts import manage_pat
 
 ADMIN_URL = os.getenv("TEST_ADMIN_DATABASE_URL")
 RUNTIME_URL = os.getenv("TEST_DATABASE_URL")
@@ -66,6 +72,93 @@ def provider(owner: UUID = OWNER) -> oauth_provider.SingleOwnerOAuthProvider:
             mcp_gateway_upstream_url="http://gateway.internal.test/mcp",
         )
     )
+
+
+def test_cli_verification_against_real_auth_and_disposable_postgres(
+    database: tuple[Any, ConnectionPool], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    admin, _pool = database
+    settings = Settings(pat_pepper=SecretStr("r2-local-pepper"))
+    admin.execute("insert into profiles (id) values (%s) on conflict (id) do nothing", (OWNER,))
+    admin.commit()
+    monkeypatch.setattr(manage_pat, "hash_pat", lambda token: hash_pat(token, settings))
+    created = manage_pat.create_pat(admin, OWNER, "r2-local", ["taxonomy:read"], 1)
+    admin.commit()
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: settings
+    with TestClient(app) as client:
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            response = client.get(request.url.path, headers={"Authorization": request.headers.get("authorization", "")})
+            return httpx.Response(response.status_code, content=response.content, headers=response.headers)
+
+        transport = httpx.MockTransport(handler)
+
+        def check() -> VerifyCode:
+            return verify_credential(
+                "https://local.example.test",
+                created.raw_token,
+                OWNER,
+                created.token_id,
+                {"taxonomy:read"},
+                transport=transport,
+            ).code
+
+        assert check() == VerifyCode.VERIFIED
+        app.dependency_overrides[get_settings] = lambda: Settings(pat_pepper=SecretStr("wrong-pepper"))
+        assert check() == VerifyCode.AUTH_REJECTED
+        app.dependency_overrides[get_settings] = lambda: settings
+        admin.execute("update personal_access_tokens set revoked_at = now() where id = %s", (created.token_id,))
+        admin.commit()
+        assert check() == VerifyCode.AUTH_REJECTED
+
+
+def test_previous_pepper_authenticates_access_and_refresh_under_runtime_role(
+    database: tuple[Any, ConnectionPool],
+) -> None:
+    admin, _pool = database
+    old = Settings(pat_pepper=SecretStr("old-local-pepper"))
+    raw_access = "det_r2_previous_access"
+    raw_refresh = "r2_previous_refresh"
+    row = admin.execute(
+        """insert into personal_access_tokens (user_id, token_hash, name, scopes, expires_at)
+           values (%s, %s, %s, %s, now() + interval '1 day') returning id""",
+        (OWNER, hash_pat(raw_access, old), "r2-old-access", ["taxonomy:read"]),
+    ).fetchone()
+    assert row is not None
+    pat_id = row["id"]
+    admin.execute(
+        """insert into oauth_refresh_tokens (user_id, token_hash, pat_token_id, expires_at)
+           values (%s, %s, %s, now() + interval '1 day')""",
+        (OWNER, hash_pat(raw_refresh, old), pat_id),
+    )
+    admin.commit()
+    settings = Settings(
+        pat_pepper=SecretStr("new-local-pepper"),
+        pat_pepper_version="v2",
+        pat_previous_pepper=SecretStr("old-local-pepper"),
+        pat_previous_pepper_version="v1",
+        pat_previous_pepper_retire_at=datetime.now(UTC) + timedelta(minutes=10),
+        owner_user_id=OWNER,
+        oauth_client_id="r2-client",
+        oauth_client_secret=SecretStr("r2-secret"),
+        oauth_issuer_url="https://gateway.example.test",
+        mcp_gateway_upstream_url="http://gateway.internal.test/mcp",
+    )
+    p = oauth_provider.SingleOwnerOAuthProvider(settings)
+    assert p._load_access_token(raw_access) is not None
+    assert p._load_refresh_token(raw_refresh) is not None
+    expired_settings = settings.model_copy(
+        update={"pat_previous_pepper_retire_at": datetime.now(UTC) - timedelta(seconds=1)}
+    )
+    expired_provider = oauth_provider.SingleOwnerOAuthProvider(expired_settings)
+    assert expired_provider._load_access_token(raw_access) is None
+    assert expired_provider._load_refresh_token(raw_refresh) is None
+    admin.execute("update personal_access_tokens set revoked_at = now() where id = %s", (pat_id,))
+    admin.execute("update oauth_refresh_tokens set revoked_at = now() where pat_token_id = %s", (pat_id,))
+    admin.commit()
+    assert p._load_access_token(raw_access) is None
+    assert p._load_refresh_token(raw_refresh) is None
 
 
 def issue(p: oauth_provider.SingleOwnerOAuthProvider) -> tuple[str, Any, Any]:
@@ -163,15 +256,17 @@ def test_expiry_binding_owner_and_rollback(
     assert counts(admin) == (0, 1, 1)
 
     expired, _client, expired_loaded = issue(p)
-    admin.execute("""update oauth_authorization_codes
+    admin.execute(
+        """update oauth_authorization_codes
                      set issued_at = now() - interval '2 minutes', expires_at = now() - interval '1 second'
-                     where code_hash = %s""", (oauth_provider.hash_authorization_code(expired),))
+                     where code_hash = %s""",
+        (oauth_provider.hash_authorization_code(expired),),
+    )
     admin.commit()
     assert asyncio.run(p.load_authorization_code(client, expired)) is None
     with pytest.raises(TokenError):
         asyncio.run(p.exchange_authorization_code(client, expired_loaded))
     assert counts(admin) == (1, 1, 1)
-
 
 
 def test_commit_failure_rolls_back_code_and_tokens_then_allows_retry(
@@ -283,9 +378,13 @@ def test_expiry_after_row_lock_wait(database: tuple[Any, ConnectionPool]) -> Non
             ).fetchone()
             assert row is not None
             expires_at = row["expires_at"]
+            # Prime an activity snapshot before the worker starts. Polling in
+            # this same lock-holding transaction must explicitly refresh it.
+            admin.execute("select count(*) from pg_stat_activity").fetchone()
             pending = executor.submit(p._redeem_authorization_code, client, loaded)
             waiting = 0
             for _ in range(200):
+                admin.execute("select pg_stat_clear_snapshot()")
                 waiting = admin.execute(
                     """select count(*) as n from pg_stat_activity
                        where datname = current_database() and wait_event_type = 'Lock'
@@ -297,9 +396,9 @@ def test_expiry_after_row_lock_wait(database: tuple[Any, ConnectionPool]) -> Non
             assert waiting == 1
             expired = False
             for _ in range(200):
-                expired = admin.execute(
-                    "select clock_timestamp() >= %s as expired", (expires_at,)
-                ).fetchone()["expired"]
+                expired = admin.execute("select clock_timestamp() >= %s as expired", (expires_at,)).fetchone()[
+                    "expired"
+                ]
                 if expired:
                     break
                 Event().wait(0.01)
@@ -321,8 +420,11 @@ def test_real_sdk_routes_validate_bindings(database: tuple[Any, ConnectionPool])
         response = client.get(
             "/authorize",
             params={
-                "response_type": "code", "client_id": "r1-client", "redirect_uri": oauth_provider.CLAUDE_REDIRECT_URI,
-                "code_challenge": challenge, "code_challenge_method": "S256",
+                "response_type": "code",
+                "client_id": "r1-client",
+                "redirect_uri": oauth_provider.CLAUDE_REDIRECT_URI,
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
                 "resource": "https://gateway.example.test/mcp",
             },
             follow_redirects=False,
@@ -330,8 +432,11 @@ def test_real_sdk_routes_validate_bindings(database: tuple[Any, ConnectionPool])
         assert response.status_code == 302
         code = parse_qs(urlsplit(response.headers["location"]).query)["code"][0]
         payload = {
-            "grant_type": "authorization_code", "code": code, "client_id": "r1-client",
-            "client_secret": "r1-secret", "redirect_uri": oauth_provider.CLAUDE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": "r1-client",
+            "client_secret": "r1-secret",
+            "redirect_uri": oauth_provider.CLAUDE_REDIRECT_URI,
             "code_verifier": verifier,
         }
         wrong_verifier = client.post("/token", data={**payload, "code_verifier": "bad-verifier"})
@@ -344,14 +449,13 @@ def test_real_sdk_routes_validate_bindings(database: tuple[Any, ConnectionPool])
         assert empty_resource.status_code == 400 and empty_resource.json()["error"] == "invalid_grant"
         duplicate_grant = client.post(
             "/token",
-            content=urlencode([*payload.items(), ("grant_type", "authorization_code"),
-                               ("resource", "https://wrong.example/mcp")]),
+            content=urlencode(
+                [*payload.items(), ("grant_type", "authorization_code"), ("resource", "https://wrong.example/mcp")]
+            ),
             headers={"content-type": "application/x-www-form-urlencoded"},
         )
         assert duplicate_grant.status_code == 400 and duplicate_grant.json()["error"] == "invalid_request"
-        multipart = client.post(
-            "/token", data=payload, files={"resource": (None, "https://wrong.example/mcp")}
-        )
+        multipart = client.post("/token", data=payload, files={"resource": (None, "https://wrong.example/mcp")})
         assert multipart.status_code == 400 and multipart.json()["error"] == "invalid_request"
         wrong_secret = client.post("/token", data={**payload, "client_secret": "wrong-secret"})
         assert wrong_secret.status_code == 401
@@ -365,8 +469,10 @@ def test_real_sdk_routes_validate_bindings(database: tuple[Any, ConnectionPool])
         optional = client.get(
             "/authorize",
             params={
-                "response_type": "code", "client_id": "r1-client",
-                "code_challenge": challenge, "code_challenge_method": "S256",
+                "response_type": "code",
+                "client_id": "r1-client",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
             },
             follow_redirects=False,
         )
@@ -391,8 +497,11 @@ def test_authorize_storage_failure_has_no_code_redirect(monkeypatch: pytest.Monk
         response = client.get(
             "/authorize",
             params={
-                "response_type": "code", "client_id": "r1-client", "redirect_uri": oauth_provider.CLAUDE_REDIRECT_URI,
-                "code_challenge": "challenge", "code_challenge_method": "S256",
+                "response_type": "code",
+                "client_id": "r1-client",
+                "redirect_uri": oauth_provider.CLAUDE_REDIRECT_URI,
+                "code_challenge": "challenge",
+                "code_challenge_method": "S256",
             },
             follow_redirects=False,
         )

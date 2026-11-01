@@ -1,14 +1,20 @@
 import argparse
 import os
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from getpass import getpass
 from typing import Any
+from urllib.parse import urlsplit
 from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
 
+from app.auth_events import configure_auth_logging, emit_auth_event
+from app.config import get_settings
+from app.pat_verification import VerifyCode, verification_target, verify_credential
 from app.security import generate_pat, hash_pat
 
 ALLOWED_SCOPES = frozenset(
@@ -64,9 +70,7 @@ def create_pat(
         raise ValueError("The selected user does not have a profile")
 
     raw_token = generate_pat()
-    expires_at = (
-        datetime.now(UTC) + timedelta(days=expires_days) if expires_days is not None else None
-    )
+    expires_at = datetime.now(UTC) + timedelta(days=expires_days) if expires_days is not None else None
     row = conn.execute(
         """
         insert into personal_access_tokens (user_id, token_hash, name, scopes, expires_at)
@@ -116,6 +120,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=365,
         help="Positive lifetime in days; use 0 for no expiry.",
     )
+    create_parser.add_argument("--verify-url", help="Explicit API base URL; overrides PAT_VERIFY_BASE_URL")
+    create_parser.add_argument("--allow-loopback-http", action="store_true")
+    create_parser.add_argument("--skip-verification", action="store_true")
+    create_parser.add_argument(
+        "--allow-development-pepper",
+        action="store_true",
+        help="Permit the development pepper only for an explicitly selected literal loopback target.",
+    )
+
+    verify_parser = subparsers.add_parser("verify", help="Verify an existing PAT without database access.")
+    verify_parser.add_argument("--verify-url", help="Explicit API base URL; overrides PAT_VERIFY_BASE_URL")
+    verify_parser.add_argument("--allow-loopback-http", action="store_true")
+    verify_parser.add_argument("--stdin", action="store_true", help="Read token from standard input")
+    verify_parser.add_argument("--user-id", type=UUID, required=True)
+    verify_parser.add_argument("--token-id", type=UUID, required=True)
+    verify_parser.add_argument("--scope", action="append", dest="scopes", choices=sorted(ALLOWED_SCOPES))
 
     revoke_parser = subparsers.add_parser("revoke", help="Revoke a PAT by ID for one user.")
     revoke_parser.add_argument("--user-id", type=UUID, required=True)
@@ -123,16 +143,59 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command in {"create", "verify"}:
+        target = args.verify_url or os.getenv("PAT_VERIFY_BASE_URL")
+        if target or not (args.command == "create" and args.skip_verification):
+            try:
+                if not target:
+                    raise ValueError("Verification target required")
+                verification_target(target, args.allow_loopback_http)
+            except ValueError:
+                print("CONFIGURATION_ERROR: provide a valid --verify-url (or PAT_VERIFY_BASE_URL)", file=sys.stderr)
+                return int(VerifyCode.CONFIGURATION_ERROR)
+    if args.command == "verify":
+        token = sys.stdin.readline().rstrip("\r\n") if args.stdin else getpass("PAT: ")
+        if not token:
+            print("CONFIGURATION_ERROR: empty token", file=sys.stderr)
+            return int(VerifyCode.CONFIGURATION_ERROR)
+        assert target is not None
+        result = verify_credential(
+            target,
+            token,
+            args.user_id,
+            args.token_id,
+            set(args.scopes) if args.scopes is not None else None,
+            allow_loopback_http=args.allow_loopback_http,
+        )
+        scope_status = "specified" if args.scopes is not None else "unspecified"
+        emit_auth_event(
+            "pat_verification", "accepted" if result.code == VerifyCode.VERIFIED else "failed", "cli", "local", 0
+        )
+        print(
+            f"{result.code.name}: selected origin {result.origin}; expected user {args.user_id}; "
+            f"token {args.token_id}; scopes {scope_status}"
+        )
+        return int(result.code)
+    if args.command == "create":
+        if args.expires_days < 0:
+            print("CONFIGURATION_ERROR: --expires-days must be nonnegative", file=sys.stderr)
+            return int(VerifyCode.CONFIGURATION_ERROR)
+        settings = get_settings()
+        pepper = settings.pat_pepper.get_secret_value()
+        if not pepper or pepper == "dev-only-change-me":
+            local_target = target is not None and urlsplit(target).hostname in {"localhost", "127.0.0.1", "::1"}
+            if not (pepper == "dev-only-change-me" and args.allow_development_pepper and local_target):
+                print("CONFIGURATION_ERROR: configure a non-development PAT_PEPPER", file=sys.stderr)
+                return int(VerifyCode.CONFIGURATION_ERROR)
     admin_database_url = os.getenv("PAT_ADMIN_DATABASE_URL")
     if not admin_database_url:
-        raise SystemExit("PAT_ADMIN_DATABASE_URL is required")
+        print("CONFIGURATION_ERROR: PAT_ADMIN_DATABASE_URL is required", file=sys.stderr)
+        return int(VerifyCode.CONFIGURATION_ERROR)
 
     with psycopg.connect(admin_database_url, row_factory=dict_row) as conn:
         if args.command == "create":
-            if args.expires_days < 0:
-                raise SystemExit("--expires-days must be zero or greater")
             scopes = args.scopes or list(DEFAULT_GPT_SCOPES)
             created = create_pat(
                 conn,
@@ -146,7 +209,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"Raw PAT (shown once): {created.raw_token}")
             if created.expires_at is not None:
                 print(f"Expires at: {created.expires_at.isoformat()}")
-            return 0
+            if args.skip_verification:
+                emit_auth_event("pat_issuance", "succeeded", "cli", settings.environment, 0)
+                print("CREATED_UNVERIFIED: saved; verification explicitly skipped")
+                return int(VerifyCode.CREATED_UNVERIFIED)
+            assert target is not None
+            result = verify_credential(
+                target,
+                created.raw_token,
+                args.user_id,
+                created.token_id,
+                set(scopes),
+                allow_loopback_http=args.allow_loopback_http,
+            )
+            print(f"{result.code.name}: saved token {created.token_id}; selected origin {result.origin}")
+            emit_auth_event("pat_issuance", "succeeded", "cli", settings.environment, 0)
+            emit_auth_event(
+                "pat_verification",
+                "accepted" if result.code == VerifyCode.VERIFIED else "failed",
+                "cli",
+                settings.environment,
+                0,
+            )
+            return int(result.code)
 
         revoked = revoke_pat(conn, args.user_id, args.token_id)
         conn.commit()
@@ -154,6 +239,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise SystemExit("PAT not found for the selected user")
         print(f"Revoked PAT: {args.token_id}")
         return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    configure_auth_logging()
+    try:
+        return _main(argv)
+    except Exception:
+        # Database and transport exceptions can contain credentials or URLs.
+        emit_auth_event("pat_issuance", "failed", "cli", "local", 0, reason="database_error")
+        print("CONFIGURATION_ERROR: operation failed; no verification claim", file=sys.stderr)
+        return int(VerifyCode.CONFIGURATION_ERROR)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import hashlib
 import secrets
 import time
 from contextvars import ContextVar
+from time import monotonic
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -24,9 +25,10 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 from starlette.types import Receive, Scope, Send
 
+from app.auth_events import emit_auth_event
 from app.config import Settings
 from app.db import connection, user_transaction
-from app.security import generate_pat, hash_pat
+from app.security import candidate_pat_hashes, generate_pat, hash_pat
 
 # Full MCP surface. There is no per-request scope enforcement downstream (the
 # gateway's own /mcp route just requires *a* valid PAT; the upstream single_user
@@ -172,9 +174,7 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
             subject=str(row["user_id"]),
         )
 
-    def _load_authorization_code(
-        self, client: OAuthClientInformationFull, code: str
-    ) -> dict[str, Any] | None:
+    def _load_authorization_code(self, client: OAuthClientInformationFull, code: str) -> dict[str, Any] | None:
         with user_transaction(self._owner_user_id) as conn:
             row = conn.execute(
                 """select user_id, client_id, redirect_uri, redirect_uri_provided_explicitly,
@@ -198,10 +198,33 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
     def _redeem_authorization_code(
         self, client: OAuthClientInformationFull, authorization_code: AuthorizationCode
     ) -> OAuthToken:
+        started = monotonic()
         try:
-            return self._redeem_authorization_code_transaction(client, authorization_code)
+            result = self._redeem_authorization_code_transaction(client, authorization_code)
         except _InvalidAuthorizationCode:
+            emit_auth_event(
+                "oauth_redemption",
+                "rejected",
+                "oauth",
+                self._settings.environment,
+                int((monotonic() - started) * 1000),
+                reason="code_invalid",
+            )
             raise TokenError(error="invalid_grant", error_description="authorization code does not exist") from None
+        except Exception:
+            emit_auth_event(
+                "oauth_redemption",
+                "unavailable",
+                "database",
+                self._settings.environment,
+                int((monotonic() - started) * 1000),
+                reason="database_error",
+            )
+            raise
+        emit_auth_event(
+            "oauth_redemption", "succeeded", "oauth", self._settings.environment, int((monotonic() - started) * 1000)
+        )
+        return result
 
     def _redeem_authorization_code_transaction(
         self, client: OAuthClientInformationFull, authorization_code: AuthorizationCode
@@ -240,9 +263,7 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
                 raise _InvalidAuthorizationCode
             return self._insert_tokens(conn, list(row["scopes"]))
 
-    async def load_refresh_token(
-        self, client: OAuthClientInformationFull, refresh_token: str
-    ) -> _RefreshToken | None:
+    async def load_refresh_token(self, client: OAuthClientInformationFull, refresh_token: str) -> _RefreshToken | None:
         return await asyncio.to_thread(self._load_refresh_token, refresh_token)
 
     async def exchange_refresh_token(
@@ -311,12 +332,15 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
         )
 
     def _load_refresh_token(self, refresh_token: str) -> _RefreshToken | None:
-        token_hash = hash_pat(refresh_token, self._settings)
         with connection() as conn:
-            row = conn.execute(
-                "select refresh_token_id, user_id, pat_token_id from app.authenticate_oauth_refresh_token(%(h)s)",
-                {"h": token_hash},
-            ).fetchone()
+            row = None
+            for token_hash in candidate_pat_hashes(refresh_token, self._settings):
+                row = conn.execute(
+                    "select refresh_token_id, user_id, pat_token_id from app.authenticate_oauth_refresh_token(%(h)s)",
+                    {"h": token_hash},
+                ).fetchone()
+                if row is not None:
+                    break
             conn.commit()
         if row is None:
             return None
@@ -335,12 +359,15 @@ class SingleOwnerOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCod
         return self._mint_tokens(scopes)
 
     def _load_access_token(self, token: str) -> _AccessToken | None:
-        token_hash = hash_pat(token, self._settings)
         with connection() as conn:
-            row = conn.execute(
-                "select token_id, user_id, scopes from app.authenticate_pat(%(h)s)",
-                {"h": token_hash},
-            ).fetchone()
+            row = None
+            for token_hash in candidate_pat_hashes(token, self._settings):
+                row = conn.execute(
+                    "select token_id, user_id, scopes from app.authenticate_pat(%(h)s)",
+                    {"h": token_hash},
+                ).fetchone()
+                if row is not None:
+                    break
             conn.commit()
         if row is None:
             return None

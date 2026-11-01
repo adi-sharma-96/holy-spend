@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlsplit
@@ -15,6 +16,10 @@ class Settings(BaseSettings):
     environment: str = "local"
     database_url: str = Field(default="postgresql://expense_app:change-me@localhost:54322/postgres")
     pat_pepper: SecretStr = Field(default=SecretStr("dev-only-change-me"))
+    pat_pepper_version: str = "v1"
+    pat_previous_pepper: SecretStr | None = None
+    pat_previous_pepper_version: str | None = None
+    pat_previous_pepper_retire_at: datetime | None = None
     reconciliation_accepted_cents: int = 2
     reconciliation_warning_cents: int = 100
     supported_currencies: tuple[str, ...] = ("CAD", "USD")
@@ -103,6 +108,34 @@ class Settings(BaseSettings):
         return candidate
 
     @model_validator(mode="after")
+    def validate_pat_rotation(self) -> "Settings":
+        current = self.pat_pepper.get_secret_value()
+        if self.environment != "local" and (not current or current == "dev-only-change-me"):
+            raise ValueError("Remote environments require a configured PAT_PEPPER")
+        fields = (self.pat_previous_pepper, self.pat_previous_pepper_version, self.pat_previous_pepper_retire_at)
+        if any(field is not None for field in fields) and not all(field is not None for field in fields):
+            raise ValueError("Previous PAT pepper requires a version and retirement deadline")
+        if not self.pat_pepper_version or len(self.pat_pepper_version) > 32 or not self.pat_pepper_version.isascii():
+            raise ValueError("Invalid PAT_PEPPER_VERSION")
+        if self.pat_previous_pepper is not None:
+            previous = self.pat_previous_pepper.get_secret_value()
+            if (
+                not previous
+                or previous == current
+                or previous == "dev-only-change-me"
+                or (self.environment != "local" and current == "dev-only-change-me")
+                or self.pat_previous_pepper_version == self.pat_pepper_version
+                or not self.pat_previous_pepper_version
+                or len(self.pat_previous_pepper_version) > 32
+                or not self.pat_previous_pepper_version.isascii()
+                or self.pat_previous_pepper_retire_at is None
+                or self.pat_previous_pepper_retire_at.tzinfo is None
+                or self.pat_previous_pepper_retire_at.utcoffset() is None
+            ):
+                raise ValueError("Invalid previous PAT pepper rotation configuration")
+        return self
+
+    @model_validator(mode="after")
     def validate_mcp_mode_exclusive(self) -> "Settings":
         if self.mcp_enabled and self.mcp_gateway_upstream_url is not None:
             raise ValueError(
@@ -125,9 +158,7 @@ class Settings(BaseSettings):
         oauth_fields = (self.oauth_client_id, self.oauth_client_secret, self.oauth_issuer_url)
         if any(field is not None for field in oauth_fields):
             if not all(field is not None for field in oauth_fields):
-                raise ValueError(
-                    "OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, and OAUTH_ISSUER_URL must be set together"
-                )
+                raise ValueError("OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, and OAUTH_ISSUER_URL must be set together")
             if self.mcp_gateway_upstream_url is None:
                 raise ValueError("OAuth settings require MCP_GATEWAY_UPSTREAM_URL: it only applies to the gateway")
         return self

@@ -1,9 +1,13 @@
+import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 import pytest
+from pydantic import SecretStr
 
+from app.config import Settings
+from app.pat_verification import VerifyCode
 from scripts import manage_pat
 
 USER_ID = UUID("33333333-3333-3333-3333-333333333333")
@@ -104,10 +108,75 @@ def test_cli_prints_raw_pat_once(monkeypatch: pytest.MonkeyPatch, capsys: pytest
             "Private GPT",
             "--scope",
             "taxonomy:read",
+            "--skip-verification",
+            "--verify-url",
+            "http://127.0.0.1:8765",
+            "--allow-loopback-http",
+            "--allow-development-pepper",
         ]
     )
     output = capsys.readouterr().out
 
-    assert exit_code == 0
+    assert exit_code == VerifyCode.CREATED_UNVERIFIED
     assert output.count("det_only-once") == 1
     assert conn.commits == 1
+
+
+def test_remote_target_rejects_default_pepper_before_database(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("PAT_ADMIN_DATABASE_URL", "postgresql://sentinel-db-secret@localhost/test")
+    monkeypatch.setattr(manage_pat, "get_settings", lambda: Settings(pat_pepper=SecretStr("dev-only-change-me")))
+    monkeypatch.setattr("scripts.manage_pat.psycopg.connect", lambda *_a, **_k: pytest.fail("database touched"))
+    result = manage_pat.main(
+        [
+            "create",
+            "--user-id",
+            str(USER_ID),
+            "--name",
+            "remote",
+            "--verify-url",
+            "https://api.example.test",
+        ]
+    )
+    output = capsys.readouterr()
+    assert result == VerifyCode.CONFIGURATION_ERROR
+    assert "sentinel-db-secret" not in output.out + output.err
+
+
+def test_skip_with_default_pepper_needs_explicit_loopback_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(manage_pat, "get_settings", lambda: Settings(pat_pepper=SecretStr("dev-only-change-me")))
+    monkeypatch.setattr("scripts.manage_pat.psycopg.connect", lambda *_a, **_k: pytest.fail("database touched"))
+    result = manage_pat.main(["create", "--user-id", str(USER_ID), "--name", "offline", "--skip-verification"])
+    assert result == VerifyCode.CONFIGURATION_ERROR
+
+
+def test_cli_emits_safe_failure_event_without_logging_override(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("PAT_ADMIN_DATABASE_URL", "postgresql://sentinel-db-secret@localhost/test")
+    monkeypatch.setattr(manage_pat, "get_settings", lambda: Settings(pat_pepper=SecretStr("safe-local-pepper")))
+    monkeypatch.setattr(
+        "scripts.manage_pat.psycopg.connect",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("sentinel-exception-secret")),
+    )
+    result = manage_pat.main(
+        [
+            "create",
+            "--user-id",
+            str(USER_ID),
+            "--name",
+            "offline",
+            "--skip-verification",
+        ]
+    )
+    output = capsys.readouterr()
+    assert result == VerifyCode.CONFIGURATION_ERROR
+    assert "sentinel-db-secret" not in output.err
+    assert "sentinel-exception-secret" not in output.err
+    event = json.loads(output.err.splitlines()[0])
+    assert (event["event"], event["outcome"], event["reason"]) == (
+        "pat_issuance",
+        "failed",
+        "database_error",
+    )

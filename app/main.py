@@ -3,12 +3,13 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.analytics import AnalyticsQueryCompiler, AnalyticsRepository
 from app.application import ExpenseApplicationService
+from app.auth_events import configure_auth_logging, emit_auth_event
 from app.clock import local_today
 from app.config import Settings, get_settings
 from app.dependencies import RequestContext, get_request_context
@@ -55,7 +56,7 @@ from app.oauth_provider import build_oauth_routes
 from app.object_storage import ObjectStorage, UploadRateLimiter
 from app.receipt_files import ReceiptFileService, ReceiptRepository
 from app.repositories import TaxonomyRepository, TransactionRepository
-from app.security import require_scope
+from app.security import AuthenticatedUser, get_current_user, require_scope
 from app.storage_dependencies import get_object_storage, get_upload_rate_limiter
 
 
@@ -80,6 +81,7 @@ def translate_error(error: Exception) -> HTTPException:
 
 
 def create_app() -> FastAPI:
+    configure_auth_logging()
     # Deployed on both api (gateway) and mcp (server) - which role this
     # process takes is decided entirely by settings.
     settings = get_settings()
@@ -137,6 +139,29 @@ def create_app() -> FastAPI:
     @app.get("/health", response_model=HealthResponse, tags=["system"])
     def health(settings: Annotated[Settings, Depends(get_settings)]) -> HealthResponse:
         return HealthResponse(status="ok", app=settings.app_name, environment=settings.environment)
+
+    @app.get("/v1/auth/verify", tags=["system"])
+    def verify_pat(
+        user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+        response: Response,
+        request: Request,
+    ) -> dict[str, object]:
+        response.headers["Cache-Control"] = "no-store"
+        emit_auth_event(
+            "pat_verification",
+            "accepted",
+            "api",
+            settings.environment,
+            0,
+            request.state.auth_correlation_id,
+        )
+        return {
+            "service": "holy-spend",
+            "response": "pat-verification-v1",
+            "user_id": str(user.user_id),
+            "token_id": str(user.token_id),
+            "scopes": sorted(user.scopes),
+        }
 
     @app.get("/v1/taxonomy", response_model=TaxonomyResponse, tags=["taxonomy"])
     def taxonomy(ctx: Annotated[RequestContext, Depends(get_request_context)]) -> TaxonomyResponse:
@@ -219,9 +244,7 @@ def create_app() -> FastAPI:
     ) -> ReceiptFileDownloadUrlResponse:
         require_scope(ctx.user, "transactions:read")
         try:
-            service = ReceiptFileService(
-                ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings
-            )
+            service = ReceiptFileService(ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings)
             return service.create_download_url(receipt_id, file_id)
         except Exception as error:
             raise translate_error(error) from error
@@ -241,9 +264,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         require_scope(ctx.user, "transactions:write")
         try:
-            service = ReceiptFileService(
-                ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings
-            )
+            service = ReceiptFileService(ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings)
             deleted = service.delete_file(receipt_id, file_id)
         except Exception as error:
             raise translate_error(error) from error
@@ -266,9 +287,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         require_scope(ctx.user, "transactions:write")
         try:
-            service = ReceiptFileService(
-                ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings
-            )
+            service = ReceiptFileService(ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings)
             deleted = service.delete_receipt(receipt_id)
         except Exception as error:
             raise translate_error(error) from error
@@ -467,9 +486,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         require_scope(ctx.user, "transactions:write")
         try:
-            service = ReceiptFileService(
-                ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings
-            )
+            service = ReceiptFileService(ReceiptRepository(ctx.conn, ctx.user.user_id), storage, rate_limiter, settings)
             deleted = service.delete_transaction(transaction_id)
         except Exception as error:
             raise translate_error(error) from error
@@ -485,9 +502,7 @@ def create_app() -> FastAPI:
     ) -> AliasResolveResponse:
         require_scope(ctx.user, "aliases:read")
         repo = TransactionRepository(ctx.conn, ctx.user.user_id)
-        return AliasResolveResponse(
-            resolutions=repo.resolve_aliases(payload.merchant_normalized, payload.items)
-        )
+        return AliasResolveResponse(resolutions=repo.resolve_aliases(payload.merchant_normalized, payload.items))
 
     @app.post("/v1/analytics/query", response_model=AnalyticsQueryResponse, tags=["analytics"])
     def query_analytics(

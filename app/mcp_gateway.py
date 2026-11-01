@@ -1,13 +1,16 @@
 from collections.abc import AsyncIterator
+from time import monotonic
 from typing import Annotated
 
 import httpx
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2.id_token import fetch_id_token
 from starlette.background import BackgroundTask
 
+from app.auth_events import correlation_id, emit_auth_event
+from app.config import get_settings
 from app.security import AuthenticatedUser, get_current_user
 
 
@@ -17,6 +20,7 @@ from app.security import AuthenticatedUser, get_current_user
 # cached: correctness over the single-digit milliseconds a cache would save here.
 def _google_id_token(audience: str) -> str:
     return str(fetch_id_token(GoogleAuthRequest(), audience))  # type: ignore[no-untyped-call]
+
 
 # A public-network hop terminates and re-originates the connection, so these
 # must never be copied onto the upstream request/response verbatim (RFC 7230
@@ -75,14 +79,16 @@ def build_gateway_router(
         request: Request,
         _user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     ) -> StreamingResponse:
+        started = monotonic()
+        correlation = getattr(request.state, "auth_correlation_id", None) or correlation_id(
+            request.headers.get("x-correlation-id")
+        )
         target = httpx.URL(upstream_url)
         if request.url.query:
             target = target.copy_with(query=request.url.query.encode())
 
         forwarded_headers = [
-            (key, value)
-            for key, value in request.headers.items()
-            if key.lower() not in _EXCLUDED_REQUEST_HEADERS
+            (key, value) for key, value in request.headers.items() if key.lower() not in _EXCLUDED_REQUEST_HEADERS
         ]
         if use_google_id_token:
             forwarded_headers.append(("authorization", f"Bearer {_google_id_token(upstream_url)}"))
@@ -94,7 +100,27 @@ def build_gateway_router(
             headers=forwarded_headers,
             content=body,
         )
-        upstream_response = await client.send(upstream_request, stream=True)
+        try:
+            upstream_response = await client.send(upstream_request, stream=True)
+        except httpx.HTTPError:
+            emit_auth_event(
+                "mcp_upstream",
+                "unavailable",
+                "gateway",
+                get_settings().environment,
+                int((monotonic() - started) * 1000),
+                correlation,
+                reason="upstream_error",
+            )
+            raise HTTPException(status_code=502, detail="MCP upstream unavailable") from None
+        emit_auth_event(
+            "mcp_upstream",
+            "succeeded" if upstream_response.status_code < 500 else "failed",
+            "gateway",
+            get_settings().environment,
+            int((monotonic() - started) * 1000),
+            correlation,
+        )
 
         response_headers = {
             key: value
