@@ -1,5 +1,7 @@
 import hashlib
 import json
+from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -9,7 +11,9 @@ from app.models import (
     ReceiptFileRecord,
     TransactionAdjustmentCreate,
     TransactionDetail,
+    TransactionStatus,
     ValidationResponse,
+    ValidationSeverity,
 )
 from app.plugin_models import (
     ExpenseCorrectionRequest,
@@ -19,7 +23,8 @@ from app.plugin_models import (
     ReceiptSnapshot,
 )
 from app.receipt_files import ReceiptRepository
-from app.reconciliation import ReconciliationService, has_blocking_issues
+from app.receipt_workflows import ReceiptWorkflowRepository, fingerprint
+from app.reconciliation import ReconciliationService, has_blocking_issues, item_gross_total
 from app.repositories import TransactionRepository
 
 
@@ -38,9 +43,7 @@ class ExpenseApplicationService:
         receipt = self.receipts.get_receipt_for_transaction(transaction_id)
         receipt_snapshot = None
         if receipt is not None:
-            files: list[ReceiptFileRecord] = [
-                owned.public_record() for owned in self.receipts.list_files(receipt.id)
-            ]
+            files: list[ReceiptFileRecord] = [owned.public_record() for owned in self.receipts.list_files(receipt.id)]
             receipt_snapshot = ReceiptSnapshot(receipt=receipt, files=files)
         return ExpenseSnapshot(transaction=transaction, receipt=receipt_snapshot)
 
@@ -67,9 +70,7 @@ class ExpenseApplicationService:
             if request.expected_revision is None:
                 raise ConflictError("expected_revision is required when replacing an existing draft")
             if request.expected_revision != actual_revision:
-                raise ConflictError(
-                    "Draft changed since it was loaded; refresh it before applying further edits"
-                )
+                raise ConflictError("Draft changed since it was loaded; refresh it before applying further edits")
             transaction = self.transactions.replace_draft(request.transaction_id, payload)
 
         transaction = self._add_indexed_adjustments(transaction, request)
@@ -84,9 +85,21 @@ class ExpenseApplicationService:
         transaction = self.transactions.get_transaction(transaction_id)
         delta, issues = ReconciliationService(self.settings).validate(transaction)
         persisted = self.transactions.set_validation_result(transaction_id, delta, issues)
+        reviewed = self.transactions.get_transaction(transaction_id)
+        item_delta = (
+            (reviewed.subtotal_amount - item_gross_total(reviewed)).quantize(Decimal("0.01"))
+            if reviewed.subtotal_amount is not None and reviewed.items else None
+        )
+        warnings = [
+            {"code": candidate.code, "metadata": candidate.metadata}
+            for candidate in issues if candidate.severity == ValidationSeverity.WARNING
+        ]
         return ValidationResponse(
             transaction_id=transaction_id,
             reconciliation_delta_amount=delta,
+            item_subtotal_delta_amount=item_delta,
+            reviewed_revision=reviewed.updated_at,
+            warning_digest=fingerprint(warnings) if warnings else None,
             issues=persisted,
         )
 
@@ -112,9 +125,7 @@ class ExpenseApplicationService:
         if status.value != "confirmed":
             raise ConflictError("Only confirmed expenses can use the correction workflow")
         if request.expected_revision != actual_revision:
-            raise ConflictError(
-                "Expense changed since it was loaded; refresh it before applying the correction"
-            )
+            raise ConflictError("Expense changed since it was loaded; refresh it before applying the correction")
 
         transaction = self.transactions.replace_confirmed(
             request.transaction_id,
@@ -136,13 +147,35 @@ class ExpenseApplicationService:
         )
         return MutationResult(expense=self.get_expense(transaction.id))
 
-    def confirm(self, transaction_id: UUID, explicit_approval: bool) -> TransactionDetail:
+    def confirm(
+        self,
+        transaction_id: UUID,
+        explicit_approval: bool,
+        expected_revision: datetime | None = None,
+        acknowledged_warning_digest: str | None = None,
+    ) -> TransactionDetail:
         if not explicit_approval:
             raise ConflictError("Explicit user approval is required before confirmation")
-        validation = self.validate(transaction_id)
-        if has_blocking_issues(validation.issues):
+        status, revision = self.transactions.lock_draft(transaction_id)
+        if status == TransactionStatus.CONFIRMED:
+            return self.transactions.get_transaction(transaction_id)
+        if status != TransactionStatus.DRAFT or expected_revision is None or expected_revision != revision:
+            raise ConflictError("Draft revision changed; validate and review the current draft before confirmation")
+        transaction = self.transactions.get_transaction(transaction_id)
+        delta, issues = ReconciliationService(self.settings).validate(transaction)
+        if has_blocking_issues(issues):
             raise ConflictError("Blocking validation issues must be resolved before confirmation")
-        return self.transactions.confirm_transaction(transaction_id)
+        warnings = [
+            {"code": candidate.code, "metadata": candidate.metadata}
+            for candidate in issues
+            if candidate.severity == ValidationSeverity.WARNING
+        ]
+        if warnings and acknowledged_warning_digest != fingerprint(warnings):
+            raise ConflictError("Warnings changed or were not acknowledged for this revision")
+        self.transactions.set_validation_result(transaction_id, delta, issues)
+        confirmed = self.transactions.confirm_transaction(transaction_id)
+        ReceiptWorkflowRepository(self.conn, self.user_id).sync_confirmed(transaction_id)
+        return confirmed
 
     def _add_indexed_adjustments(
         self,

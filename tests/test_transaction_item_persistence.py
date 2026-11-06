@@ -37,6 +37,10 @@ class RecordingConnection:
 
 
 class ItemInsertRepository(TransactionRepository):
+    def lock_draft(self, transaction_id: UUID) -> tuple[TransactionStatus, datetime]:
+        assert transaction_id == TRANSACTION_ID
+        return TransactionStatus.DRAFT, datetime(2026, 1, 1)
+
     def get_transaction(self, transaction_id: UUID) -> Any:
         assert transaction_id == TRANSACTION_ID
         return SimpleNamespace(

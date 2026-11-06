@@ -173,6 +173,7 @@ or Codex at this repo per "Extending it" above.
 - Taxonomy v2, the classification system behind Price Watch, Nutrition, and every category: [docs/taxonomy-v2.md](docs/taxonomy-v2.md)
 - Product comparisons require confirmed identity and measurement evidence; the widget's **Fix matches** screen lets you review uncertain products, preview corrections, and reverse a correction while its reviewed revision is current.
 - Receipt storage and lifecycle: [docs/supabase-storage.md](docs/supabase-storage.md), [docs/analyze-before-commit-receipts.md](docs/analyze-before-commit-receipts.md)
+- Multi-receipt batches persist per-file progress for resume and retry. Confirmation checks the reviewed revision and warnings; adjusted orders can retain multiple originals and sourced wallet events on one purchase.
 
 ## License
 

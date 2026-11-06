@@ -118,10 +118,7 @@ class ReconciliationService:
                     "Add at least one classified product, service, or whole-bill line before confirmation.",
                 )
             )
-        if (
-            transaction.classification_mode == TransactionClassificationMode.WHOLE_BILL
-            and len(transaction.items) != 1
-        ):
+        if transaction.classification_mode == TransactionClassificationMode.WHOLE_BILL and len(transaction.items) != 1:
             issues.append(
                 issue(
                     ValidationSeverity.BLOCKING,
@@ -231,15 +228,7 @@ class ReconciliationService:
 
         expected_total: Decimal | None = None
         if subtotal_base is not None:
-            expected_total = (
-                money(subtotal_base)
-                + tax
-                + fee
-                + tip
-                + deposit
-                + rounding
-                - discount
-            )
+            expected_total = money(subtotal_base) + tax + fee + tip + deposit + rounding - discount
 
         delta: Decimal | None = None
         if expected_total is not None:
@@ -247,6 +236,11 @@ class ReconciliationService:
             self._append_reconciliation_issue(issues, "total", delta, expected_total)
 
         if transaction.items and transaction.subtotal_amount is not None:
+            # Compare the printed subtotal with gross product lines directly.
+            # A balanced final payable amount must not hide this discrepancy.
+            gross_items = item_gross_total(transaction).quantize(Decimal("0.01"))
+            subtotal_delta = (transaction.subtotal_amount - gross_items).quantize(Decimal("0.01"))
+            self._append_reconciliation_issue(issues, "subtotal", subtotal_delta, gross_items)
             allocated_discount = sum((money(item.line_discount_amount) for item in transaction.items), ZERO)
             allocated_tax = sum((money(item.line_tax_amount) for item in transaction.items), ZERO)
             allocated_fee = sum((money(item.line_fee_amount) for item in transaction.items), ZERO)

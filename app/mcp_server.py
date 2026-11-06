@@ -1,9 +1,11 @@
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
+from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -101,12 +103,22 @@ from app.product_review import (
     ReviewPreviewRequest,
     ReviewReverseRequest,
 )
-from app.receipt_commit import ReceiptCommitSaga
+from app.receipt_commit import ReceiptCommitSaga, deterministic_object_key
 from app.receipt_downloads import RemoteReceiptDownloader
 from app.receipt_extraction import ReceiptCommitRequest, ReceiptCommitResult
 from app.receipt_files import ALLOWED_RECEIPT_TYPES, ReceiptFileService, ReceiptRepository
 from app.receipt_normalization import normalize_receipt_savings
-from app.reconciliation import has_blocking_issues
+from app.receipt_recovery import CleanupAttempt, ReceiptRecoveryRepository
+from app.receipt_workflows import (
+    AttachmentProgress,
+    BatchInput,
+    BatchRecord,
+    DocumentEventInput,
+    ReceiptWorkflowRepository,
+    VersionAttachInput,
+    fingerprint,
+)
+from app.reconciliation import has_blocking_issues, item_gross_total
 from app.repositories import TaxonomyRepository, TransactionRepository
 from app.storage_dependencies import get_object_storage, get_upload_rate_limiter
 
@@ -205,6 +217,13 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
             "For an attached receipt, visually extract it and call create_receipt_draft_from_file once with the "
             "native file parameter and complete candidate. The tool verifies, normalizes, reconciles, stores, and "
             "returns the saved draft without opening UI. Never store or repeat temporary download URLs. "
+            "For a multi-receipt request, register up to 20 attachments with start_receipt_batch, process at most "
+            "four at once, and read get_receipt_batch after interruption. Save each status before reporting it. "
+            "A possible matching order requires review as a revised document or a genuine separate purchase; "
+            "never merge solely on amount, date or merchant. A draft is not a confirmed purchase. "
+            "Validate and use the returned reviewed_revision and warning_digest for confirmation; "
+            "batch add-and-confirm authorization applies only to its registered attachments. "
+            "Record wallet movements as document events, not purchases. "
             "On a host with no native hosted-URL file parameter for the attachment (e.g. Claude), do not call "
             "create_receipt_draft_from_file at all; instead extract the same complete candidate and call "
             "save_expense_draft directly, and explicitly tell the user in the same reply that every extracted "
@@ -594,10 +613,11 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
 
     @server.tool(
         title="Get product review queue",
-        description=("Use this when the owner wants to review uncertain product matches or measurements. "
-                     "Returns owner-scoped evidence issues, source text, reasons and priority."),
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                    idempotentHint=True, openWorldHint=False),
+        description=(
+            "Use this when the owner wants to review uncertain product matches or measurements. "
+            "Returns owner-scoped evidence issues, source text, reasons and priority."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     def get_product_review_queue(limit: int = 50, include_suppressed: bool = False) -> list[dict[str, Any]]:
         def action() -> list[dict[str, Any]]:
@@ -606,76 +626,91 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
                 return ProductReviewRepository(conn, principal.user_id).queue(
                     limit=max(1, min(limit, 100)), include_suppressed=include_suppressed
                 )
+
         return _safe(action)
 
     @server.tool(
         title="List product corrections",
-        description=("Use this when the owner wants to reopen correction history after leaving the review screen. "
-                     "Lists current owner items with correction events, including resolved items."),
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                    idempotentHint=True, openWorldHint=False),
+        description=(
+            "Use this when the owner wants to reopen correction history after leaving the review screen. "
+            "Lists current owner items with correction events, including resolved items."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     def list_product_corrections(limit: int = 50) -> list[dict[str, Any]]:
         def action() -> list[dict[str, Any]]:
             principal = resolver.resolve()
             with user_transaction(principal.user_id) as conn:
                 return ProductReviewRepository(conn, principal.user_id).recent_corrections(limit=limit)
+
         return _safe(action)
 
     @server.tool(
         title="Get product correction history",
-        description=("Use this when inspecting a reviewed item's correction history. "
-                     "Returns owner-scoped events and reversal state."),
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                    idempotentHint=True, openWorldHint=False),
+        description=(
+            "Use this when inspecting a reviewed item's correction history. "
+            "Returns owner-scoped events and reversal state."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     def get_product_correction_history(item_id: UUID) -> list[dict[str, Any]]:
         def action() -> list[dict[str, Any]]:
             principal = resolver.resolve()
             with user_transaction(principal.user_id) as conn:
                 return ProductReviewRepository(conn, principal.user_id).history(item_id)
+
         return _safe(action)
 
     @server.tool(
         title="Preview product correction",
-        description=("Use this when preparing a product correction before confirmation. "
-                     "Shows exact owner-scoped records, revisions and before/after values."),
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
-                                    idempotentHint=True, openWorldHint=False),
+        description=(
+            "Use this when preparing a product correction before confirmation. "
+            "Shows exact owner-scoped records, revisions and before/after values."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     def preview_product_correction(request: ReviewPreviewRequest) -> ReviewPreview:
         def action() -> ReviewPreview:
             principal = resolver.resolve()
             with user_transaction(principal.user_id) as conn:
                 return ProductReviewRepository(conn, principal.user_id).preview(request)
+
         return _safe(action)
 
     @server.tool(
         title="Decide product review",
-        description=("Use this when the owner has inspected the evidence and preview. "
-                     "Confirm, reject or defer the reviewed revision with a stable operation ID."),
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
-                                    idempotentHint=True, openWorldHint=False),
+        description=(
+            "Use this when the owner has inspected the evidence and preview. "
+            "Confirm, reject or defer the reviewed revision with a stable operation ID."
+        ),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
     )
     def decide_product_review(request: ReviewDecisionRequest) -> ReviewDecisionResult:
         def action() -> ReviewDecisionResult:
             principal = resolver.resolve()
             with user_transaction(principal.user_id) as conn:
                 return ProductReviewRepository(conn, principal.user_id).decide(request)
+
         return _safe(action)
 
     @server.tool(
         title="Reverse product correction",
-        description=("Use this when the owner wants to undo a correction. "
-                     "Reversal succeeds only while the reviewed item remains unchanged."),
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
-                                    idempotentHint=True, openWorldHint=False),
+        description=(
+            "Use this when the owner wants to undo a correction. "
+            "Reversal succeeds only while the reviewed item remains unchanged."
+        ),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
     )
     def reverse_product_correction(request: ReviewReverseRequest) -> ReviewDecisionResult:
         def action() -> ReviewDecisionResult:
             principal = resolver.resolve()
             with user_transaction(principal.user_id) as conn:
                 return ProductReviewRepository(conn, principal.user_id).reverse(request)
+
         return _safe(action)
 
     @server.tool(
@@ -798,7 +833,7 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
             "and trans fat, carbohydrates, sugars, added sugars, fiber, sodium, cholesterol, potassium, calcium, "
             "iron) without exception, and added_sugars_g is a different number from sugars_g, not a duplicate of "
             "it - only report it when the source states it separately. When the source shows an explicit "
-            "serving-based breakdown (e.g. \"2 tbsp (30 mL)\", \"1 slice (28g)\"), report serving_label using the "
+            'serving-based breakdown (e.g. "2 tbsp (30 mL)", "1 slice (28g)"), report serving_label using the '
             "source's own wording alongside serving_size_g - never invent one for a source that only gives "
             "per-100g values. Report nutriscore_grade only when the "
             "source itself states it (e.g. an Open Food Facts page showing a Nutri-Score badge); the app computes "
@@ -1079,6 +1114,207 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
         return _safe(action)
 
     @server.tool(
+        title="Start receipt batch",
+        description=(
+            "Use this when starting up to 20 receipt attachments with existing authorization. "
+            "Resume with get_receipt_batch."
+        ),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    def start_receipt_batch(payload: BatchInput) -> BatchRecord:
+        def action() -> BatchRecord:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ReceiptWorkflowRepository(conn, principal.user_id).start(payload)
+
+        return _safe(action)
+
+    @server.tool(
+        title="Get receipt batch",
+        description=(
+            "Use this when reading persisted attachment progress, links, failures and unresolved questions "
+            "after interruption or in a new chat."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
+    )
+    def get_receipt_batch(batch_id: UUID) -> BatchRecord:
+        def action() -> BatchRecord:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ReceiptWorkflowRepository(conn, principal.user_id).get(batch_id)
+
+        return _safe(action)
+
+    @server.tool(
+        title="Confirm authorized batch attachment",
+        description=(
+            "Use this when confirming the exact reviewed draft revision and this batch already carries "
+            "the user's add-and-confirm authorization."
+        ),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    def confirm_receipt_batch_attachment(
+        batch_id: UUID,
+        attachment_id: UUID,
+        expected_revision: datetime,
+        acknowledged_warning_digest: str | None = None,
+    ) -> ExpenseSnapshot:
+        def action() -> ExpenseSnapshot:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                workflow = ReceiptWorkflowRepository(conn, principal.user_id)
+                transaction_id = workflow.authorized_transaction(batch_id, attachment_id)
+                service = ExpenseApplicationService(conn, principal.user_id, settings)
+                service.confirm(transaction_id, True, expected_revision, acknowledged_warning_digest)
+                return service.get_expense(transaction_id)
+
+        return _safe(action)
+
+    @server.tool(
+        title="Record receipt progress",
+        description=("Use this when persisting extraction, clarification, or safe retry and terminal failure."),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    def record_receipt_progress(payload: AttachmentProgress) -> BatchRecord:
+        def action() -> BatchRecord:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ReceiptWorkflowRepository(conn, principal.user_id).progress(payload)
+
+        return _safe(action)
+
+    @server.tool(
+        title="Record receipt document event",
+        description=(
+            "Use this when recording sourced order, refund or wallet evidence on a reviewed confirmed "
+            "purchase without adding another purchase."
+        ),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    def record_receipt_document_event(payload: DocumentEventInput) -> dict[str, Any]:
+        def action() -> dict[str, Any]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ReceiptWorkflowRepository(conn, principal.user_id).record_event(payload)
+
+        return _safe(action)
+
+    @server.tool(
+        title="Get receipt document timeline",
+        description=(
+            "Use this when reading originals, chronological revisions, adjustments and wallet events for one purchase."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
+    )
+    def get_receipt_document_timeline(transaction_id: UUID) -> dict[str, Any]:
+        def action() -> dict[str, Any]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ReceiptWorkflowRepository(conn, principal.user_id).timeline(transaction_id)
+
+        return _safe(action)
+
+    @server.tool(
+        title="Get receipt recovery work",
+        description="Use this when listing unresolved storage cleanup without object keys or signed URLs.",
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
+    )
+    def get_receipt_recovery_work() -> list[dict[str, Any]]:
+        def action() -> list[dict[str, Any]]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ReceiptRecoveryRepository(conn, principal.user_id).list_unresolved()
+
+        return _safe(action)
+
+    @server.tool(
+        title="Retry receipt cleanup",
+        description="Use this when resolving one staged upload by retaining an adopted original or removing an orphan.",
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True),
+    )
+    def retry_receipt_cleanup(job_id: UUID) -> dict[str, Any]:
+        def action() -> dict[str, Any]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return ReceiptRecoveryRepository(conn, principal.user_id).recover(job_id, get_object_storage())
+
+        return _safe(action)
+
+    @server.tool(
+        title="Attach receipt version",
+        description=(
+            "Use this when storing a revised or adjustment original on an approved confirmed purchase. "
+            "Financial changes still require the audited correction workflow."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True),
+        meta={"openai/fileParams": ["file"]},
+    )
+    def attach_receipt_version_from_file(file: OpenAIFileInput, payload: VersionAttachInput) -> ReceiptCommitResult:
+        def action() -> ReceiptCommitResult:
+            principal = resolver.resolve()
+            downloaded = RemoteReceiptDownloader(settings).download(file)
+            saga: ReceiptCommitSaga | None = None
+            recovery_attempt: CleanupAttempt | None = None
+            with user_transaction(principal.user_id) as conn:
+                receipt = ReceiptRepository(conn, principal.user_id).get_receipt_for_transaction(payload.transaction_id)
+                if receipt is None:
+                    raise ConflictError("Purchase has no receipt record")
+                object_key = deterministic_object_key(
+                    principal.user_id,
+                    receipt.id,
+                    payload.operation_id,
+                    downloaded.sha256,
+                    Path(downloaded.filename).suffix.lower(),
+                )
+                recovery_attempt = ReceiptRecoveryRepository(conn, principal.user_id).stage(
+                    settings.storage_bucket, object_key, downloaded.sha256
+                )
+            try:
+                with user_transaction(principal.user_id) as conn:
+                    saga = ReceiptCommitSaga(
+                        conn,
+                        principal.user_id,
+                        settings,
+                        get_object_storage(),
+                        get_upload_rate_limiter(),
+                        recovery_attempt=recovery_attempt,
+                        require_staged_upload=True,
+                    )
+                    result = saga.attach_version(payload, downloaded)
+                    if payload.batch_id is not None or payload.attachment_id is not None:
+                        ReceiptWorkflowRepository(conn, principal.user_id).record_version_attachment(
+                            payload,
+                            UUID(result.receipt_file_id),
+                            downloaded.sha256,
+                        )
+                saga.compensation_object = None
+                if recovery_attempt is not None:
+                    with user_transaction(principal.user_id) as conn:
+                        ReceiptRecoveryRepository(conn, principal.user_id).recover(
+                            recovery_attempt.job_id, get_object_storage(),
+                            finished_attempt_id=recovery_attempt.attempt_id,
+                        )
+                return result
+            except Exception:
+                if recovery_attempt is not None:
+                    with user_transaction(principal.user_id) as conn:
+                        ReceiptRecoveryRepository(conn, principal.user_id).recover(
+                            recovery_attempt.job_id, get_object_storage(),
+                            finished_attempt_id=recovery_attempt.attempt_id,
+                        )
+                raise
+
+        return _safe(action)
+
+    @server.tool(
         title="Create receipt draft from file",
         description=(
             "Use this when the user attached one receipt image or PDF and ChatGPT has visually extracted a complete "
@@ -1102,34 +1338,212 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
     def create_receipt_draft_from_file(
         file: OpenAIFileInput,
         draft: ExpenseDraftInput,
+        batch_id: UUID | None = None,
+        attachment_id: UUID | None = None,
+        operation_id: str | None = None,
+        allow_distinct_purchase: bool = False,
+        distinct_decision_source: str | None = None,
     ) -> ReceiptCommitResult:
         def action() -> CallToolResult:
             principal = resolver.resolve()
-            downloaded = RemoteReceiptDownloader(settings).download(file)
+            try:
+                downloaded = RemoteReceiptDownloader(settings).download(file)
+            except Exception:
+                if batch_id is not None and attachment_id is not None:
+                    with user_transaction(principal.user_id) as conn:
+                        ReceiptWorkflowRepository(conn, principal.user_id).progress(
+                            AttachmentProgress(
+                                batch_id=batch_id,
+                                attachment_id=attachment_id,
+                                status="retryable_failure",
+                                retry_reason="download_failed",
+                            )
+                        )
+                raise
             normalized_draft = normalize_receipt_savings(draft)
             request = ReceiptCommitRequest(
                 file_sha256=downloaded.sha256,
                 draft=normalized_draft,
-                client_request_id=f"sha256:{downloaded.sha256}",
+                client_request_id=operation_id or f"sha256:{downloaded.sha256}",
             )
+            if batch_id is not None or attachment_id is not None:
+                if batch_id is None or attachment_id is None or operation_id is None:
+                    raise ConflictError("Batch, attachment and operation IDs must be supplied together")
+                with user_transaction(principal.user_id) as conn:
+                    prior = ReceiptWorkflowRepository(conn, principal.user_id).lock_attachment(
+                        batch_id, attachment_id
+                    )
+                    if prior["operation_id"] != operation_id:
+                        raise ConflictError("Operation ID does not match registered attachment")
+                    if prior["status"] in {"confirmed", "exact_duplicate"}:
+                        if (prior["payload_fingerprint"] != request.payload_hash()
+                                or prior["content_sha256"] != downloaded.sha256
+                                or prior["transaction_id"] is None or prior["receipt_file_id"] is None):
+                            raise ConflictError("Completed attachment has different bytes or intent")
+                        replay_saga = ReceiptCommitSaga(
+                            conn, principal.user_id, settings,
+                            get_object_storage(), get_upload_rate_limiter(),
+                        )
+                        replay = ReceiptCommitResult(
+                            expense=replay_saga.application.get_expense(prior["transaction_id"]),
+                            receipt_file_id=str(prior["receipt_file_id"]),
+                            validation=replay_saga._validation_result(prior["transaction_id"], persist=False),
+                            idempotent_replay=True, exact_file_duplicate=True,
+                        )
+                        return CallToolResult(
+                            content=[TextContent(type="text", text="Attachment already completed.")],
+                            structuredContent=replay.model_dump(mode="json"),
+                        )
+                    if prior["status"] not in {"extracting", "draft_saved", "possible_duplicate"}:
+                        raise ConflictError("Mark the attachment extracting before processing it")
             saga: ReceiptCommitSaga | None = None
+            recovery_attempt: CleanupAttempt | None = None
             try:
                 with user_transaction(principal.user_id) as conn:
+                    workflow = ReceiptWorkflowRepository(conn, principal.user_id)
+                    order_key = (
+                        normalized_draft.receipt.receipt_number if normalized_draft.receipt is not None else None
+                    )
+                    existing_hash = ReceiptRepository(conn, principal.user_id).get_commit_result_by_hash(
+                        downloaded.sha256
+                    )
+                    candidate = (
+                        workflow.find_order_candidate(
+                            normalized_draft.provider_key,
+                            order_key,
+                            normalized_draft.currency,
+                            normalized_draft.transaction_date,
+                            downloaded.sha256,
+                        )
+                        if existing_hash is None
+                        else None
+                    )
+                    if candidate is not None and not allow_distinct_purchase:
+                        if batch_id is None or attachment_id is None or operation_id is None:
+                            raise ConflictError(
+                                f"Possible existing order {candidate}; review before creating another purchase"
+                            )
+                        batch = workflow.record_candidate(
+                            batch_id,
+                            attachment_id,
+                            operation_id=operation_id,
+                            payload_fingerprint=request.payload_hash(),
+                            content_sha256=downloaded.sha256,
+                            provider_key=normalized_draft.provider_key or "",
+                            order_key=order_key or "",
+                            candidate_id=candidate,
+                        )
+                        return CallToolResult(
+                            content=[
+                                TextContent(
+                                    type="text",
+                                    text=(
+                                        "Possible existing order. Review the linked transaction and decide whether "
+                                        "this is a revised document or a separate purchase."
+                                    ),
+                                )
+                            ],
+                            structuredContent=batch.model_dump(mode="json"),
+                        )
+                    if allow_distinct_purchase:
+                        if not distinct_decision_source or len(distinct_decision_source.strip()) < 3:
+                            raise ConflictError("Record the user's separate-purchase decision source")
+                        if batch_id is None or attachment_id is None:
+                            raise ConflictError("Separate-purchase decision must reference a batch attachment")
+                        previous = workflow.lock_attachment(batch_id, attachment_id)
+                        if (
+                            previous["status"] != "possible_duplicate"
+                            or previous["payload_fingerprint"] != request.payload_hash()
+                            or previous["content_sha256"] != downloaded.sha256
+                        ):
+                            raise ConflictError("Review the current possible duplicate before proceeding")
+                    transaction_id = uuid5(principal.user_id, f"receipt-file:{downloaded.sha256}")
+                    receipt_id = uuid5(transaction_id, "receipt")
+                    object_key = deterministic_object_key(
+                        principal.user_id,
+                        receipt_id,
+                        request.client_request_id,
+                        downloaded.sha256,
+                        Path(downloaded.filename).suffix.lower(),
+                    )
+                    # Separate commit: cleanup intent survives failure of the
+                    # purchase transaction or a process exit during upload.
+                    with user_transaction(principal.user_id) as ledger_conn:
+                        recovery_attempt = ReceiptRecoveryRepository(ledger_conn, principal.user_id).stage(
+                            settings.storage_bucket, object_key, downloaded.sha256
+                        )
                     saga = ReceiptCommitSaga(
                         conn,
                         principal.user_id,
                         settings,
                         get_object_storage(),
                         get_upload_rate_limiter(),
+                        recovery_attempt=recovery_attempt,
+                        require_staged_upload=True,
                     )
                     result = saga.commit(request, downloaded)
+                    ReceiptWorkflowRepository(conn, principal.user_id).record_version(
+                        result.expense.transaction.id,
+                        UUID(result.receipt_file_id),
+                        kind="original",
+                        occurred_at=datetime.combine(
+                            normalized_draft.transaction_date, datetime.min.time(), tzinfo=UTC
+                        ),
+                    )
+                    refreshed_validation = saga._validation_result(result.expense.transaction.id)
+                    result = result.model_copy(
+                        update={
+                            "expense": saga.application.get_expense(result.expense.transaction.id),
+                            "validation": refreshed_validation,
+                        }
+                    )
+                    if batch_id is not None or attachment_id is not None:
+                        if batch_id is None or attachment_id is None or operation_id is None:
+                            raise ConflictError("Batch, attachment and operation IDs must be supplied together")
+                        workflow.record_draft(
+                            batch_id,
+                            attachment_id,
+                            operation_id=operation_id,
+                            payload_fingerprint=request.payload_hash(),
+                            content_sha256=downloaded.sha256,
+                            transaction_id=result.expense.transaction.id,
+                            receipt_file_id=UUID(result.receipt_file_id),
+                            duplicate=result.exact_file_duplicate,
+                            issues=[issue.model_dump(mode="json") for issue in result.validation.issues],
+                            provider_key=normalized_draft.provider_key,
+                            order_key=order_key,
+                            distinct_decision_source=distinct_decision_source,
+                        )
                 saga.compensation_object = None
+                if recovery_attempt is not None:
+                    with user_transaction(principal.user_id) as conn:
+                        ReceiptRecoveryRepository(conn, principal.user_id).recover(
+                            recovery_attempt.job_id, get_object_storage(),
+                            finished_attempt_id=recovery_attempt.attempt_id,
+                        )
             except Exception:
-                if saga is not None and saga.compensation_object is not None:
+                if recovery_attempt is not None:
                     try:
-                        saga.compensate("database_commit_failed")
+                        with user_transaction(principal.user_id) as conn:
+                            ReceiptRecoveryRepository(conn, principal.user_id).recover(
+                                recovery_attempt.job_id, get_object_storage(),
+                                finished_attempt_id=recovery_attempt.attempt_id,
+                            )
                     except Exception:
-                        logger.exception("Receipt compensation failed")
+                        logger.exception("Receipt recovery attempt failed")
+                if batch_id is not None and attachment_id is not None:
+                    try:
+                        with user_transaction(principal.user_id) as conn:
+                            ReceiptWorkflowRepository(conn, principal.user_id).progress(
+                                AttachmentProgress(
+                                    batch_id=batch_id,
+                                    attachment_id=attachment_id,
+                                    status="retryable_failure",
+                                    retry_reason="commit_failed",
+                                )
+                            )
+                    except ConflictError:
+                        pass
                 raise
 
             duplicate_message = (
@@ -1210,6 +1624,17 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
                 service = ExpenseApplicationService(conn, principal.user_id, settings)
                 validation = service.validate(transaction_id)
                 transaction = service.transactions.get_transaction(transaction_id)
+                computed_items = item_gross_total(transaction).quantize(Decimal("0.01")) if transaction.items else None
+                item_delta = (
+                    (transaction.subtotal_amount - computed_items).quantize(Decimal("0.01"))
+                    if transaction.subtotal_amount is not None and computed_items is not None
+                    else None
+                )
+                warnings = [
+                    {"code": issue.code, "metadata": issue.metadata}
+                    for issue in validation.issues
+                    if issue.severity.value == "warning"
+                ]
                 computed_total = (
                     transaction.total_amount - validation.reconciliation_delta_amount
                     if validation.reconciliation_delta_amount is not None
@@ -1219,6 +1644,11 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
                     transaction_id=transaction_id,
                     reconciliation_delta_amount=validation.reconciliation_delta_amount,
                     computed_total_amount=computed_total,
+                    item_subtotal_delta_amount=item_delta,
+                    printed_subtotal_amount=transaction.subtotal_amount,
+                    computed_item_subtotal_amount=computed_items,
+                    reviewed_revision=transaction.updated_at,
+                    warning_digest=fingerprint(warnings) if warnings else None,
                     issues=validation.issues,
                     confirmation_eligible=not has_blocking_issues(validation.issues),
                 )
@@ -1238,12 +1668,17 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
             openWorldHint=False,
         ),
     )
-    def confirm_expense(transaction_id: UUID, explicit_approval: bool) -> ExpenseSnapshot:
+    def confirm_expense(
+        transaction_id: UUID,
+        explicit_approval: bool,
+        expected_revision: datetime | None = None,
+        acknowledged_warning_digest: str | None = None,
+    ) -> ExpenseSnapshot:
         def action() -> ExpenseSnapshot:
             principal = resolver.resolve()
             with user_transaction(principal.user_id) as conn:
                 service = ExpenseApplicationService(conn, principal.user_id, settings)
-                service.confirm(transaction_id, explicit_approval)
+                service.confirm(transaction_id, explicit_approval, expected_revision, acknowledged_warning_digest)
                 return service.get_expense(transaction_id)
 
         return _safe(action)

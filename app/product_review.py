@@ -119,6 +119,17 @@ class ProductReviewRepository:
         self.user_id = user_id
 
     def _item(self, item_id: UUID, *, lock: bool = False) -> dict[str, Any]:
+        if lock:
+            parent = self.conn.execute(
+                "select transaction_id from transaction_items where id=%(id)s and user_id=%(user_id)s",
+                {"id": item_id, "user_id": self.user_id},
+            ).fetchone()
+            if parent is None:
+                raise NotFoundError("Review item not found")
+            self.conn.execute(
+                "select id from transactions where id=%(id)s and user_id=%(user_id)s for update",
+                {"id": parent["transaction_id"], "user_id": self.user_id},
+            )
         row = self.conn.execute(
             """
             select i.*, t.status, t.currency, t.transaction_date,
@@ -368,6 +379,11 @@ class ProductReviewRepository:
             raise ConflictError("Confirmation requires a proposed correction")
         if request.decision != "confirmed" and len(rows) != 1:
             raise ConflictError("Reject and defer apply to one reviewed item")
+        if request.decision == "confirmed":
+            self.conn.execute(
+                "select set_config('app.confirmed_child_edit_reason', %(reason)s, true)",
+                {"reason": request.reason},
+            )
         for row in rows:
             if request.decision == "confirmed":
                 before = self._snapshot(row)
@@ -436,6 +452,10 @@ class ProductReviewRepository:
         unchanged = _json_value(self._snapshot(row)) == event["after_value"]
         if row["evidence_revision"] != event["applied_revision"] or not unchanged:
             raise ConflictError("A later edit changed this item; reversal requires review")
+        self.conn.execute(
+            "select set_config('app.confirmed_child_edit_reason', %(reason)s, true)",
+            {"reason": request.reason},
+        )
         before = event["before_value"]
         assignments = ", ".join(f"{field} = %({field})s" for field in SNAPSHOT_FIELDS)
         params = {key: _database_value(key, value) for key, value in before.items()}

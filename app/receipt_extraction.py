@@ -27,6 +27,12 @@ class ReceiptCommitRequest(BaseModel):
         encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
         return hashlib.sha256(encoded).hexdigest()
 
+    def payload_hash(self) -> str:
+        """Intent fingerprint independent of the retry operation ID or filename."""
+        canonical = self.model_dump(mode="json", exclude={"client_request_id"})
+        encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(encoded).hexdigest()
+
 
 class ReceiptCommitResult(BaseModel):
     expense: ExpenseSnapshot

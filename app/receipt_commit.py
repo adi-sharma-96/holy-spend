@@ -1,12 +1,14 @@
 import hashlib
 from contextlib import suppress
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
 
 from app.application import ExpenseApplicationService
 from app.config import Settings
-from app.errors import InvalidUploadError, StorageOperationError
+from app.errors import ConflictError, InvalidUploadError, StorageOperationError
+from app.models import TransactionStatus
 from app.object_storage import ObjectStorage, UploadRateLimiter
 from app.plugin_models import ExpenseDraftSaveRequest, ExpenseValidationResult
 from app.receipt_downloads import DownloadedReceipt
@@ -16,7 +18,9 @@ from app.receipt_extraction import (
     validate_commit_against_download,
 )
 from app.receipt_files import OwnedReceiptFile, ReceiptRepository
-from app.reconciliation import has_blocking_issues
+from app.receipt_recovery import CleanupAttempt, ReceiptRecoveryRepository
+from app.receipt_workflows import ReceiptWorkflowRepository, VersionAttachInput, fingerprint
+from app.reconciliation import ReconciliationService, has_blocking_issues, item_gross_total
 from app.repositories import TransactionRepository
 
 
@@ -30,12 +34,16 @@ class ReceiptCommitSaga:
         settings: Settings,
         storage: ObjectStorage,
         rate_limiter: UploadRateLimiter,
+        recovery_attempt: CleanupAttempt | None = None,
+        require_staged_upload: bool = False,
     ) -> None:
         self.conn = conn
         self.user_id = user_id
         self.settings = settings
         self.storage = storage
         self.rate_limiter = rate_limiter
+        self.recovery_attempt = recovery_attempt
+        self.require_staged_upload = require_staged_upload
         self.receipts = ReceiptRepository(conn, user_id)
         self.application = ExpenseApplicationService(conn, user_id, settings)
         self.compensation_object: tuple[str, str] | None = None
@@ -45,11 +53,15 @@ class ReceiptCommitSaga:
         request: ReceiptCommitRequest,
         downloaded: DownloadedReceipt,
     ) -> ReceiptCommitResult:
-        request_hash = request.stable_hash()
+        request_hash = request.payload_hash()
         self.receipts.acquire_commit_lock(request.file_sha256)
         replay = self.receipts.get_commit_result_by_hash(request.file_sha256)
         if replay is not None:
-            validation = self._validation_result(replay.transaction_id)
+            if replay.request_hash not in {request_hash, request.stable_hash()}:
+                raise ConflictError(
+                    "Receipt bytes are already linked to another intent; review the existing transaction"
+                )
+            validation = self._validation_result(replay.transaction_id, persist=False)
             return ReceiptCommitResult(
                 expense=self.application.get_expense(replay.transaction_id),
                 receipt_file_id=str(replay.file.id),
@@ -113,6 +125,7 @@ class ReceiptCommitSaga:
             downloaded.byte_size,
             downloaded.sha256,
         )
+        self._assert_upload_protected(pending, downloaded.sha256)
         self.compensation_object = (pending.bucket_name, pending.object_key)
         try:
             if not self.storage.object_exists(pending.bucket_name, pending.object_key):
@@ -150,6 +163,93 @@ class ReceiptCommitSaga:
             validation=validation,
         )
 
+    def attach_version(self, request: VersionAttachInput, downloaded: DownloadedReceipt) -> ReceiptCommitResult:
+        """Attach another original to one reviewed purchase without another expense."""
+        if not request.explicit_approval:
+            raise ConflictError("Explicit approval is required to attach a confirmed purchase document")
+        intent_hash = fingerprint(
+            {
+                "transaction_id": request.transaction_id,
+                "file_sha256": downloaded.sha256,
+                "document_kind": request.document_kind,
+                "provider_order_key": request.provider_order_key,
+                "occurred_at": request.occurred_at,
+                "supersedes_file_id": request.supersedes_file_id,
+                "extracted_facts": request.extracted_facts,
+            }
+        )
+        self.receipts.acquire_commit_lock(downloaded.sha256)
+        replay = self.receipts.get_commit_result_by_hash(downloaded.sha256)
+        if replay is not None:
+            if replay.transaction_id != request.transaction_id or replay.request_hash != intent_hash:
+                raise ConflictError("These receipt bytes are already linked to a different document intent")
+            return ReceiptCommitResult(
+                expense=self.application.get_expense(replay.transaction_id),
+                receipt_file_id=str(replay.file.id),
+                validation=self._validation_result(replay.transaction_id, persist=False),
+                idempotent_replay=True,
+                exact_file_duplicate=True,
+            )
+        status, revision = self.application.transactions.lock_draft(request.transaction_id)
+        if status != TransactionStatus.CONFIRMED or revision != request.expected_revision:
+            raise ConflictError("Purchase changed; review its current revision before attaching a document")
+        receipt = self.receipts.get_receipt_for_transaction(request.transaction_id)
+        if receipt is None:
+            raise ConflictError("Purchase has no receipt record")
+        self.rate_limiter.check(self.user_id)
+        extension = Path(downloaded.filename).suffix.lower()
+        object_key = deterministic_object_key(
+            self.user_id, receipt.id, request.operation_id, downloaded.sha256, extension
+        )
+        pending = self.receipts.create_pending_file(
+            receipt.id,
+            self.settings.storage_bucket,
+            object_key,
+            downloaded.filename,
+            downloaded.mime_type,
+            downloaded.byte_size,
+            downloaded.sha256,
+        )
+        self._assert_upload_protected(pending, downloaded.sha256)
+        self.compensation_object = (pending.bucket_name, pending.object_key)
+        try:
+            if not self.storage.object_exists(pending.bucket_name, pending.object_key):
+                self.storage.upload_object(
+                    pending.bucket_name, pending.object_key, downloaded.content, downloaded.mime_type
+                )
+            metadata = self.storage.confirm_upload(pending.bucket_name, pending.object_key)
+            self._validate_stored_file(pending, metadata.byte_size, metadata.mime_type)
+            confirmed = self.receipts.confirm_file(
+                receipt.id, pending.id, metadata.byte_size, metadata.mime_type, downloaded.sha256
+            )
+            ReceiptWorkflowRepository(self.conn, self.user_id).record_version(
+                request.transaction_id,
+                confirmed.id,
+                kind=request.document_kind,
+                order_key=request.provider_order_key,
+                occurred_at=request.occurred_at,
+                supersedes_file_id=request.supersedes_file_id,
+                extracted_facts=request.extracted_facts,
+            )
+            self.receipts.record_commit_result(
+                request.operation_id,
+                intent_hash,
+                downloaded.sha256,
+                request.transaction_id,
+                receipt.id,
+                confirmed.id,
+                confirmed.object_key,
+            )
+        except Exception:
+            self.compensate("receipt_version_attach_failed")
+            raise
+        validation = self._validation_result(request.transaction_id)
+        return ReceiptCommitResult(
+            expense=self.application.get_expense(request.transaction_id),
+            receipt_file_id=str(confirmed.id),
+            validation=validation,
+        )
+
     def compensate(self, reason: str) -> None:
         if self.compensation_object is None:
             return
@@ -164,20 +264,44 @@ class ReceiptCommitSaga:
         else:
             self.compensation_object = None
 
-    def _validation_result(self, transaction_id: UUID) -> ExpenseValidationResult:
-        validation = self.application.validate(transaction_id)
+    def _assert_upload_protected(self, pending: OwnedReceiptFile, source_sha256: str) -> None:
+        if not self.require_staged_upload:
+            return
+        if self.recovery_attempt is None:
+            raise ConflictError("Upload cleanup protection is required")
+        ReceiptRecoveryRepository(self.conn, self.user_id).assert_active_attempt(
+            self.recovery_attempt, pending.bucket_name, pending.object_key, source_sha256
+        )
+
+    def _validation_result(self, transaction_id: UUID, *, persist: bool = True) -> ExpenseValidationResult:
+        if persist:
+            validation = self.application.validate(transaction_id)
+            delta, issues = validation.reconciliation_delta_amount, validation.issues
+        else:
+            current = self.application.transactions.get_transaction(transaction_id)
+            delta, issues = ReconciliationService(self.settings).validate(current)
         transaction = self.application.transactions.get_transaction(transaction_id)
-        computed_total = (
-            transaction.total_amount - validation.reconciliation_delta_amount
-            if validation.reconciliation_delta_amount is not None
+        computed_items = item_gross_total(transaction) if transaction.items else None
+        item_delta = (
+            (transaction.subtotal_amount - computed_items).quantize(Decimal("0.01"))
+            if transaction.subtotal_amount is not None and computed_items is not None
             else None
         )
+        warnings = [
+            {"code": issue.code, "metadata": issue.metadata} for issue in issues if issue.severity.value == "warning"
+        ]
+        computed_total = transaction.total_amount - delta if delta is not None else None
         return ExpenseValidationResult(
             transaction_id=transaction_id,
-            reconciliation_delta_amount=validation.reconciliation_delta_amount,
+            reconciliation_delta_amount=delta,
             computed_total_amount=computed_total,
-            issues=validation.issues,
-            confirmation_eligible=not has_blocking_issues(validation.issues),
+            item_subtotal_delta_amount=item_delta,
+            printed_subtotal_amount=transaction.subtotal_amount,
+            computed_item_subtotal_amount=computed_items,
+            reviewed_revision=transaction.updated_at,
+            warning_digest=fingerprint(warnings) if warnings else None,
+            issues=issues,
+            confirmation_eligible=not has_blocking_issues(issues),
         )
 
     @staticmethod

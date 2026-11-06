@@ -277,6 +277,24 @@ def test_item_level_reconciliation_detects_inconsistent_net_lines() -> None:
     assert any(candidate.code == "item_reconciliation_warning" for candidate in issues)
 
 
+def test_zero_order_delta_still_reports_printed_subtotal_gap() -> None:
+    tx = transaction("93.51", "88.90")
+    tx.tip_amount = Decimal("4.61")
+    tx.classification_mode = TransactionClassificationMode.ITEMIZED
+    tx.items = [
+        _item("77777777-7777-7777-7777-777777777778", "Synthetic packet A", "44.00", "44.00"),
+        _item("77777777-7777-7777-7777-777777777779", "Synthetic packet B", "45.75", "45.75"),
+    ]
+
+    delta, issues = ReconciliationService(Settings()).validate(tx)
+
+    assert delta == Decimal("0.00")
+    assert any(
+        candidate.code == "subtotal_reconciliation_warning" and candidate.metadata["delta"] == "-0.85"
+        for candidate in issues
+    )
+
+
 def test_quantity_must_be_positive_when_present() -> None:
     tx = transaction("1.00", "1.00")
     tx.classification_mode = TransactionClassificationMode.ITEMIZED

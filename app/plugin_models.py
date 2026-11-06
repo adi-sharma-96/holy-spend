@@ -188,6 +188,11 @@ class ExpenseValidationResult(BaseModel):
     transaction_id: UUID
     reconciliation_delta_amount: Decimal | None
     computed_total_amount: Decimal | None
+    item_subtotal_delta_amount: Decimal | None = None
+    printed_subtotal_amount: Decimal | None = None
+    computed_item_subtotal_amount: Decimal | None = None
+    reviewed_revision: datetime | None = None
+    warning_digest: str | None = None
     issues: list[ValidationIssue]
     confirmation_eligible: bool
 

@@ -9,7 +9,7 @@ import pytest
 
 import app.receipt_commit as receipt_commit_module
 from app.config import Settings
-from app.errors import StorageOperationError
+from app.errors import ConflictError, StorageOperationError
 from app.models import (
     ReceiptFileUploadStatus,
     ReceiptRecord,
@@ -305,24 +305,20 @@ def test_same_idempotency_key_replays_without_duplicate_draft_or_object(
     assert storage.upload_calls == 1
 
 
-def test_same_exact_file_with_different_retry_metadata_returns_existing_record(
+def test_same_exact_file_with_different_intent_conflicts_without_new_record(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     saga, _transactions, _receipts, storage = make_saga(monkeypatch)
     first = saga.commit(commit_request(), downloaded())
     saga.compensation_object = None
 
-    replay = saga.commit(
-        commit_request(
-            draft=commit_request().draft.model_copy(
-                update={"total_amount": Decimal("12.00")}
-            )
-        ),
-        downloaded(),
-    )
+    with pytest.raises(ConflictError, match="already linked"):
+        saga.commit(
+            commit_request(draft=commit_request().draft.model_copy(update={"total_amount": Decimal("12.00")})),
+            downloaded(),
+        )
 
-    assert replay.expense.transaction.id == first.expense.transaction.id
-    assert replay.exact_file_duplicate is True
+    assert first.expense.transaction.id == TRANSACTION_ID
     assert storage.upload_calls == 1
 
 

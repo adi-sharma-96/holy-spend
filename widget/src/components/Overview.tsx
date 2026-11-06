@@ -8,6 +8,7 @@ import {
 import { categoryIcon } from "../category-icons";
 import { compactDate, fullDate, money, percent } from "../format";
 import { Icon, type IconName } from "../icons";
+import { ReceiptBatchPanel } from "./ReceiptBatchPanel";
 import type {
   BasketProduct,
   DashboardCategory,
@@ -59,6 +60,8 @@ type Props = {
   transactions?: TransactionListResponse;
   transactionStatus: LoadStatus;
   activityFilter?: "all" | "draft" | "confirmed";
+  receiptBatchId?: string;
+  onReceiptBatchIdChange?: (id: string) => void;
   onSectionChange: (section: TrackerSection) => void;
   onPeriodChange: (period: DashboardPeriod) => void;
   onRefresh: () => void;
@@ -1003,6 +1006,8 @@ export function Overview({
   transactions,
   transactionStatus,
   activityFilter = "all",
+  receiptBatchId,
+  onReceiptBatchIdChange = () => undefined,
   onSectionChange,
   onPeriodChange,
   onRefresh,
@@ -1409,6 +1414,7 @@ export function Overview({
               <Icon name="add" size={16} /> Add
             </button>
           </div>
+          <ReceiptBatchPanel batchId={receiptBatchId} onBatchIdChange={onReceiptBatchIdChange} />
           <div className="activity-filters" aria-label="Activity filters">
             {(["all", "draft", "confirmed"] as const).map((filter) => (
               <button

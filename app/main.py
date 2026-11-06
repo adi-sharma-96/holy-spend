@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -462,12 +463,16 @@ def create_app() -> FastAPI:
         transaction_id: UUID,
         ctx: Annotated[RequestContext, Depends(get_request_context)],
         settings: Annotated[Settings, Depends(get_settings)],
+        expected_revision: datetime | None = None,
+        acknowledged_warning_digest: str | None = None,
     ) -> TransactionDetail:
         require_scope(ctx.user, "transactions:write")
         try:
             return ExpenseApplicationService(ctx.conn, ctx.user.user_id, settings).confirm(
                 transaction_id,
                 explicit_approval=True,
+                expected_revision=expected_revision,
+                acknowledged_warning_digest=acknowledged_warning_digest,
             )
         except Exception as error:
             raise translate_error(error) from error

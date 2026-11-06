@@ -166,6 +166,9 @@ export function App() {
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>(
     (window.openai?.widgetState?.activityFilter as ActivityFilter) || "all",
   );
+  const [receiptBatchId, setReceiptBatchId] = useState<string | undefined>(
+    window.openai?.widgetState?.receiptBatchId as string | undefined,
+  );
   const [dashboard, setDashboard] = useState<ExpenseDashboard>();
   const [dashboardStatus, setDashboardStatus] = useState<"loading" | "ready" | "error">("loading");
   const [nutritionSummary, setNutritionSummary] = useState<NutritionSummary>();
@@ -198,6 +201,8 @@ export function App() {
     Array<{ severity: string; code: string; message: string }>
   >([]);
   const [approved, setApproved] = useState(false);
+  const [reviewedRevision, setReviewedRevision] = useState<string>();
+  const [warningDigest, setWarningDigest] = useState<string>();
   const [hostContext, setHostContext] = useState<HostContext>({});
   const [busy, setBusy] = useState<string>();
   const [notice, setNotice] = useState(
@@ -230,6 +235,8 @@ export function App() {
     setForm(draftFromSnapshot(next));
     setIssues(next.transaction.validation_issues || []);
     setApproved(false);
+    setReviewedRevision(undefined);
+    setWarningDigest(undefined);
     setExpenseStatus("ready");
     setExpenseError(undefined);
   }, []);
@@ -452,6 +459,9 @@ export function App() {
     const unsubscribeResults = subscribeToToolResults((result) => {
       try {
         const value = structured<Record<string, unknown>>(result);
+        if (typeof value.id === "string" && typeof value.client_batch_id === "string") {
+          setReceiptBatchId(value.id);
+        }
         if (validRoute(value.route)) navigate(value.route);
         if (value.expense && typeof value.expense === "object") {
           applyExpense(value.expense as ExpenseSnapshot);
@@ -561,7 +571,7 @@ export function App() {
   }, [hostContext.displayMode, inlineExpenseSummary, navigate, route]);
 
   useEffect(() => {
-    persistWidgetState({ route, period, activityFilter });
+    persistWidgetState({ route, period, activityFilter, receiptBatchId });
     const active = expenseRoute(route);
     if (route === "/expenses/new") {
       setExpense(undefined);
@@ -593,6 +603,7 @@ export function App() {
     loadDashboard,
     loadTransactions,
     period,
+    receiptBatchId,
     refreshExpense,
     route,
     transactions,
@@ -682,9 +693,13 @@ export function App() {
     if (!result) return;
     const validation = structured<{
       issues: Array<{ severity: string; code: string; message: string }>;
+      reviewed_revision?: string;
+      warning_digest?: string;
     }>(result);
     setIssues(validation.issues);
     await refreshExpense(saved.transaction.id);
+    setReviewedRevision(validation.reviewed_revision);
+    setWarningDigest(validation.warning_digest);
     setNotice(
       validation.issues.some((candidate) => candidate.severity === "blocking")
         ? "Resolve the blocking issues before confirmation."
@@ -694,10 +709,16 @@ export function App() {
 
   async function confirmDraft() {
     if (!expense?.transaction.id || !approved) return;
+    if (!reviewedRevision) {
+      setNotice("Validate this draft and review its current warnings before confirming.");
+      return;
+    }
     const result = await run("Confirming expense", () =>
       callTool("confirm_expense", {
         transaction_id: expense.transaction.id,
         explicit_approval: true,
+        expected_revision: reviewedRevision,
+        acknowledged_warning_digest: warningDigest,
       }),
     );
     if (!result) return;
@@ -1004,6 +1025,8 @@ export function App() {
             transactions={transactions}
             transactionStatus={transactionStatus}
             activityFilter={activityFilter}
+            receiptBatchId={receiptBatchId}
+            onReceiptBatchIdChange={setReceiptBatchId}
             onSectionChange={(section) => navigate(routeForSection(section))}
             onPeriodChange={(nextPeriod) => {
               void loadDashboard(nextPeriod);
@@ -1067,7 +1090,11 @@ export function App() {
           approved={approved}
           busy={busy}
           notice={notice}
-          onFormChange={setForm}
+          onFormChange={(next) => {
+            setForm(next);
+            setReviewedRevision(undefined);
+            setWarningDigest(undefined);
+          }}
           onApprovedChange={setApproved}
           successVisible={successVisible}
           onBack={() => void backToActivity()}

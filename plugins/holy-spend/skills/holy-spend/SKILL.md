@@ -10,7 +10,9 @@ resolves the owner; never ask for, invent, or pass a user ID.
 
 ## Choose the workflow
 
-- For a receipt image or PDF attached in chat, ChatGPT is the only extraction engine. Visually inspect it, then call `create_receipt_draft_from_file` once with the same file and a complete meaningful GPT-produced candidate. The tool atomically verifies the file, prevents exact-file duplicates, stores the original, and creates or replays the reviewable draft without opening UI.
+- For a receipt image or PDF attached in chat, ChatGPT is the only extraction engine. Visually inspect it, then call `create_receipt_draft_from_file` once with the same file and a complete meaningful candidate. The tool verifies the file, prevents exact-file duplicates, stores the original, and creates or replays the reviewable draft without opening UI.
+- For several receipts, call `start_receipt_batch` first with one stable attachment and operation ID per file and record the user's authorization scope. Process at most four attachments at once. Use `get_receipt_batch` after interruption; its persisted statuses and transaction links, rather than chat memory, determine what remains. Save extraction, clarification and failure progress with `record_receipt_progress`. Ask one combined question for genuine uncertainties and continue resolvable attachments.
+- For another document of a reviewed order, use `get_receipt_document_timeline` and `attach_receipt_version_from_file` with the confirmed transaction's current revision and explicit approval. A financial correction still uses `correct_confirmed_expense`. Record source facts with `record_receipt_document_event`; wallet refunds, top-ups and uses are payment movements, not new purchases.
 - For a purchase without a receipt, use the manual-entry editor or save a manual draft directly.
 - For corrections, load the current confirmed expense, preserve its latest revision, present the complete replacement and reason, then use `correct_confirmed_expense` only after explicit approval.
 - For history and analytics, use the read tools without opening UI unless an interactive view would help.
@@ -41,8 +43,8 @@ resolves the owner; never ask for, invent, or pass a user ID.
    branches for these attributes. Legacy category/theme fields are
    compatibility projections, not the write contract.
 10. Treat total-affecting coupons and discounts as negative contributions; taxes, fees, deposits, tips, and positive rounding as positive contributions. Preserve refunds as refunds rather than converting them into expenses.
-11. If the candidate has a positive total and either a merchant or meaningful line items, call `create_receipt_draft_from_file` once with the attached OpenAI file object, the complete draft, and a stable `client_request_id`. Do not create an empty or headless candidate.
-12. The tool result is authoritative. It either creates one reviewable draft or replays the existing transaction for identical receipt bytes. Do not retry with a new request ID merely because the same transaction already exists.
+11. If the candidate has a positive total and either a merchant or meaningful line items, call `create_receipt_draft_from_file` once with the attached OpenAI file object and complete draft. For a batch include its `batch_id`, `attachment_id`, and stable `operation_id`. Do not create an empty or headless candidate.
+12. The tool result is authoritative. It creates a reviewable draft, returns an exact duplicate, or records a possible same-order candidate. Changed intent for the same file is a conflict. Review a possible candidate before choosing a revised document or a genuine separate purchase.
 13. The tool is data-only. Keep saving, validation, and confirmation in chat unless the user explicitly asks to open, review, edit, or view the tracker.
 14. If the user explicitly requests interactive review, call `open_expense_tracker` once with `/expenses/{transaction_id}/review`. This is the same main tracker, not a separate editor.
 15. Use `save_expense_draft` for subsequent draft edits with a stable `client_request_id` and the exact latest `expected_revision`.
@@ -66,7 +68,7 @@ Saving is not confirmation.
    informational benefit, tip, total, important line items, uncertainty, and
    blocking/warning issues.
 3. Resolve blocking issues and validate again.
-4. Call `confirm_expense` with `explicit_approval: true` only after the user clearly approves the reviewed expense. An explicit request to save and confirm in the same message counts as approval once validation has no blocking issues.
+4. Call `confirm_expense` with `explicit_approval: true`, the exact `reviewed_revision`, and `acknowledged_warning_digest` when warnings exist, only after the user clearly approves the reviewed expense and permitted warnings. An explicit request to save and confirm in the same message counts as approval within that scope once validation has no blocking issues. For an authorized batch attachment use `confirm_receipt_batch_attachment` with the same revision and warning digest.
 5. Never infer approval from uploading a file, asking for extraction, saving a draft, or requesting validation.
 
 Confirmed corrections are separate from draft saves. Present the changed values and correction reason, obtain explicit approval, then call `correct_confirmed_expense` with the latest `expected_revision`. A successful correction remains confirmed, is revalidated atomically, and is audit logged.

@@ -676,6 +676,9 @@ class TransactionDetail(BaseModel):
 class ValidationResponse(BaseModel):
     transaction_id: UUID
     reconciliation_delta_amount: Decimal | None
+    item_subtotal_delta_amount: Decimal | None = None
+    reviewed_revision: datetime | None = None
+    warning_digest: str | None = None
     issues: list[ValidationIssue]
 
 

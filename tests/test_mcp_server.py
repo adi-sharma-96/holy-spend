@@ -59,7 +59,7 @@ def test_single_resource_and_tool_surface_contract() -> None:
     tools = asyncio.run(server.list_tools())
     names = {tool.name for tool in tools}
 
-    assert len(tools) == 39
+    assert len(tools) == 48
     assert {
         "get_expense_taxonomy",
         "get_taxonomy_manifest",
@@ -92,6 +92,15 @@ def test_single_resource_and_tool_surface_contract() -> None:
         "nutrition_lookup_usda_detail",
         "nutrition_lookup_off",
         "create_receipt_draft_from_file",
+        "start_receipt_batch",
+        "get_receipt_batch",
+        "confirm_receipt_batch_attachment",
+        "record_receipt_progress",
+        "record_receipt_document_event",
+        "get_receipt_document_timeline",
+        "get_receipt_recovery_work",
+        "retry_receipt_cleanup",
+        "attach_receipt_version_from_file",
         "save_expense_draft",
         "correct_confirmed_expense",
         "validate_expense",

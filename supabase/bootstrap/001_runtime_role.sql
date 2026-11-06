@@ -134,6 +134,10 @@ begin
         'email_ingestion_log'
         , 'product_review_decisions'
         , 'product_correction_events'
+        , 'receipt_batches'
+        , 'receipt_batch_attachments'
+        , 'receipt_document_versions'
+        , 'receipt_document_events'
     ]
     loop
         if to_regclass(format('public.%I', table_name)) is not null then

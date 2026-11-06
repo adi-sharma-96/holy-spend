@@ -709,8 +709,15 @@ class TransactionRepository:
         status, _revision = self.lock_draft(transaction_id)
         if status != TransactionStatus.CONFIRMED:
             raise ConflictError("Only confirmed expenses can be replaced through corrections")
+        self._authorize_confirmed_child_edit(correction_reason)
         current = self.get_transaction(transaction_id)
         prior_by_id = {item.id: item for item in current.items}
+        attributed_events = self.conn.execute(
+            """select id, item_id from receipt_document_events
+               where transaction_id=%(transaction_id)s and user_id=%(user_id)s
+                 and item_id is not null""",
+            {"transaction_id": transaction_id, "user_id": self.user_id},
+        ).fetchall()
         used_prior_ids: set[UUID] = set()
         replacement_items: list[TransactionItemCreate] = []
         for item in payload.items:
@@ -720,10 +727,14 @@ class TransactionRepository:
                     raise ValidationReferenceError("Replacement item ID is not unique in this expense")
                 used_prior_ids.add(prior_id)
                 prior = prior_by_id[prior_id]
-                evidence = invalidate_edited_evidence(
-                    prior, item.model_dump(exclude={"field_provenance", "existing_item_id"}),
-                    item.field_provenance if "field_provenance" in item.model_fields_set else None,
-                ) or prior.field_provenance
+                evidence = (
+                    invalidate_edited_evidence(
+                        prior,
+                        item.model_dump(exclude={"field_provenance", "existing_item_id"}),
+                        item.field_provenance if "field_provenance" in item.model_fields_set else None,
+                    )
+                    or prior.field_provenance
+                )
             else:
                 # New lines have no reviewed predecessor. Supplied evidence
                 # cannot borrow a label or source reference from another line.
@@ -826,8 +837,19 @@ class TransactionRepository:
             """,
             {"transaction_id": transaction_id, "user_id": self.user_id},
         )
+        new_by_prior: dict[UUID, UUID] = {}
         for item in replacement_items:
-            self.add_item(transaction_id, item)
+            inserted = self.add_item(transaction_id, item)
+            if item.existing_item_id is not None:
+                new_by_prior[item.existing_item_id] = inserted.id
+        for event in attributed_events:
+            replacement_id = new_by_prior.get(event["item_id"])
+            if replacement_id is not None:
+                self.conn.execute(
+                    """update receipt_document_events set item_id=%(item_id)s
+                       where id=%(event_id)s and user_id=%(user_id)s""",
+                    {"item_id": replacement_id, "event_id": event["id"], "user_id": self.user_id},
+                )
 
         self.clear_validation_issues(transaction_id)
         self.touch_transaction(transaction_id)
@@ -913,14 +935,19 @@ class TransactionRepository:
         self.clear_validation_issues(transaction_id)
         self.add_audit_event("transaction", transaction_id, "updated", {"fields": list(updates)})
         updated = self.get_transaction(transaction_id)
-        if current.status == TransactionStatus.CONFIRMED and {
-            "merchant_name_raw",
-            "merchant_name_normalized",
-        } & updates.keys():
+        if (
+            current.status == TransactionStatus.CONFIRMED
+            and {
+                "merchant_name_raw",
+                "merchant_name_normalized",
+            }
+            & updates.keys()
+        ):
             self.write_aliases_from_confirmed_items(transaction_id)
         return updated
 
     def add_item(self, transaction_id: UUID, payload: TransactionItemCreate) -> TransactionItem:
+        self.lock_draft(transaction_id)
         transaction = self.get_transaction(transaction_id)
         if transaction.status == TransactionStatus.VOID:
             raise ConflictError("Voided transactions cannot be edited")
@@ -987,9 +1014,7 @@ class TransactionRepository:
                 "classification_confidence": payload.classification_confidence,
                 "classification_review_status": payload.classification_review_status.value,
                 "classification_reviewed_at": (
-                    datetime.now(UTC)
-                    if payload.classification_review_status.value == "reviewed"
-                    else None
+                    datetime.now(UTC) if payload.classification_review_status.value == "reviewed" else None
                 ),
                 "quantity": payload.quantity,
                 "unit": payload.unit,
@@ -1027,11 +1052,14 @@ class TransactionRepository:
         item_id: UUID,
         payload: TransactionItemUpdate,
     ) -> TransactionItem:
+        self.lock_draft(transaction_id)
         transaction = self.get_transaction(transaction_id)
         if transaction.status == TransactionStatus.VOID:
             raise ConflictError("Voided transactions cannot be edited")
         if transaction.status == TransactionStatus.CONFIRMED and not payload.correction_reason:
             raise ConflictError("Editing a confirmed item requires correction_reason")
+        if transaction.status == TransactionStatus.CONFIRMED:
+            self._authorize_confirmed_child_edit(payload.correction_reason or "")
         current = self.get_item(transaction_id, item_id)
 
         updates = payload.model_dump(
@@ -1056,9 +1084,7 @@ class TransactionRepository:
                 updates[enum_field] = value.value
         if "classification_review_status" in updates:
             updates["classification_reviewed_at"] = (
-                datetime.now(UTC)
-                if updates["classification_review_status"] == "reviewed"
-                else None
+                datetime.now(UTC) if updates["classification_review_status"] == "reviewed" else None
             )
         reference_fields = {"concept_id", "variant_id"} & payload.model_fields_set
         if reference_fields:
@@ -1074,11 +1100,10 @@ class TransactionRepository:
                 transaction.transaction_type.value,
             )
             updates["taxonomy_node_id"] = taxonomy_node_id
-            updates["category_id"] = TaxonomyRepository(self.conn).legacy_category_id_for_node(
-                taxonomy_node_id
-            )
+            updates["category_id"] = TaxonomyRepository(self.conn).legacy_category_id_for_node(taxonomy_node_id)
         evidence = invalidate_edited_evidence(
-            current, updates,
+            current,
+            updates,
             (payload.field_provenance or ItemEvidence()) if provenance_supplied else None,
         )
         if evidence is not None:
@@ -1142,6 +1167,7 @@ class TransactionRepository:
         return updated
 
     def delete_item(self, transaction_id: UUID, item_id: UUID) -> None:
+        self.lock_draft(transaction_id)
         transaction = self.get_transaction(transaction_id)
         if transaction.status != TransactionStatus.DRAFT:
             raise ConflictError("Only draft items can be deleted without correction workflow")
@@ -1308,11 +1334,14 @@ class TransactionRepository:
         return resolutions
 
     def add_adjustment(self, transaction_id: UUID, payload: TransactionAdjustmentCreate) -> TransactionAdjustment:
+        self.lock_draft(transaction_id)
         transaction = self.get_transaction(transaction_id)
         if transaction.status == TransactionStatus.VOID:
             raise ConflictError("Voided transactions cannot be edited")
         if transaction.status == TransactionStatus.CONFIRMED and not payload.correction_reason:
             raise ConflictError("Editing a confirmed transaction requires correction_reason")
+        if transaction.status == TransactionStatus.CONFIRMED:
+            self._authorize_confirmed_child_edit(payload.correction_reason or "")
         if payload.item_id is not None:
             self.get_item(transaction_id, payload.item_id)
         row = self.conn.execute(
@@ -1369,11 +1398,14 @@ class TransactionRepository:
         adjustment_id: UUID,
         payload: TransactionAdjustmentUpdate,
     ) -> TransactionAdjustment:
+        self.lock_draft(transaction_id)
         transaction = self.get_transaction(transaction_id)
         if transaction.status == TransactionStatus.VOID:
             raise ConflictError("Voided transactions cannot be edited")
         if transaction.status == TransactionStatus.CONFIRMED and not payload.correction_reason:
             raise ConflictError("Editing a confirmed transaction requires correction_reason")
+        if transaction.status == TransactionStatus.CONFIRMED:
+            self._authorize_confirmed_child_edit(payload.correction_reason or "")
         current = self.get_adjustment(transaction_id, adjustment_id)
         updates = payload.model_dump(exclude_unset=True, exclude={"correction_reason"})
         if "type" in updates and updates["type"] is not None:
@@ -1437,11 +1469,14 @@ class TransactionRepository:
         adjustment_id: UUID,
         correction_reason: str | None = None,
     ) -> None:
+        self.lock_draft(transaction_id)
         transaction = self.get_transaction(transaction_id)
         if transaction.status == TransactionStatus.VOID:
             raise ConflictError("Voided transactions cannot be edited")
         if transaction.status == TransactionStatus.CONFIRMED and not correction_reason:
             raise ConflictError("Editing a confirmed transaction requires correction_reason")
+        if transaction.status == TransactionStatus.CONFIRMED:
+            self._authorize_confirmed_child_edit(correction_reason or "")
         current = self.get_adjustment(transaction_id, adjustment_id)
         result = self.conn.execute(
             """
@@ -1772,6 +1807,12 @@ class TransactionRepository:
             },
         )
         self.add_audit_event("transaction", transaction_id, "corrected", {"field": field_name})
+
+    def _authorize_confirmed_child_edit(self, reason: str) -> None:
+        self.conn.execute(
+            "select set_config('app.confirmed_child_edit_reason', %(reason)s, true)",
+            {"reason": reason},
+        )
 
     def add_audit_event(
         self,
