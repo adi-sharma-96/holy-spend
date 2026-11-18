@@ -5022,3 +5022,74 @@ label textarea {
 .receipt-batch-panel li { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-top: 1px solid #d8e0df; }
 .receipt-batch-panel li button { align-self: flex-start; }
 .receipt-batch-panel small { overflow-wrap: anywhere; }
+.spending-comparison-note {
+  display: block;
+  color: var(--text-soft);
+}
+
+.spending-buckets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.25rem;
+  margin: 0.75rem 0;
+}
+
+.spending-buckets dt {
+  text-transform: capitalize;
+}
+
+.spending-buckets dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.ordinary-comparison {
+  margin-top: 0.5rem;
+}
+
+.hosted-tracker {
+  max-width: 75rem;
+  margin: auto;
+  padding: clamp(0.75rem, 2vw, 2rem);
+}
+
+.hosted-tracker .overview {
+  width: 100%;
+}
+
+.hosted-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.hosted-header h1 {
+  margin: 0;
+}
+
+.hosted-launch {
+  max-width: 32rem;
+  margin: 2rem auto;
+  padding: 1.5rem;
+}
+
+.hosted-spending {
+  padding: 1rem;
+}
+
+.hosted-spending-list {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+}
+
+.hosted-spending-list li {
+  padding: 0.5rem 0;
+}
+
+.protein-cost {
+  padding: 0.75rem 0;
+  overflow-wrap: anywhere;
+}

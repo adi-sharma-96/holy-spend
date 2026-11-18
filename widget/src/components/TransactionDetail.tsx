@@ -16,8 +16,8 @@ type Props = {
   snapshot: ExpenseSnapshot;
   busy?: string;
   onClose: () => void;
-  onEdit: () => void;
-  onDelete: () => Promise<void>;
+  onEdit?: () => void;
+  onDelete?: () => Promise<void>;
   onDownload: (fileId: string) => Promise<void>;
   onPriceHistory: (identityKey: string, currency: string) => Promise<ItemPriceHistory | undefined>;
 };
@@ -68,7 +68,7 @@ export function TransactionDetail({
               </p>
             </div>
           </div>
-          <div className="more-wrap">
+          {onDelete && <div className="more-wrap">
             <button
               className="icon-button"
               onClick={() => setMenuOpen((current) => !current)}
@@ -89,7 +89,7 @@ export function TransactionDetail({
                 </button>
               </div>
             )}
-          </div>
+          </div>}
         </header>
 
         <div className="detail-total">
@@ -261,11 +261,11 @@ export function TransactionDetail({
           <button className="secondary-button" onClick={onClose}>
             Close
           </button>
-          <button className="primary-button" onClick={onEdit}>
+          {onEdit && <button className="primary-button" onClick={onEdit}>
             {transaction.status === "draft" ? "Review draft" : "View full details"}
-          </button>
+          </button>}
         </footer>
-        {confirmDelete && (
+        {confirmDelete && onDelete && (
           <ConfirmSheet
             title={transaction.status === "draft" ? "Discard draft?" : "Delete expense?"}
             message="This permanently removes the expense, its line items, adjustments, receipt metadata, and owned receipt files."

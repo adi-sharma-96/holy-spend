@@ -90,7 +90,7 @@ describe("InlineLauncher", () => {
     expect(screen.getByRole("button", { name: /transactions/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /price watch/i })).toBeInTheDocument();
     expect(screen.getByText("Farm Boy")).toBeInTheDocument();
-    expect(screen.getByLabelText("Six-month spending chart").children).toHaveLength(6);
+    expect(screen.getByLabelText("Recorded monthly spending through the selected date").children).toHaveLength(6);
     const categories = screen.getByLabelText("Top spending categories");
     expect(categories.children).toHaveLength(4);
     expect(within(categories).getByText("Groceries")).toBeInTheDocument();
@@ -105,8 +105,7 @@ describe("InlineLauncher", () => {
     expect(screen.getByText(/jul 26 · 5 items/i)).toBeInTheDocument();
 
     const trendsCard = screen.getByRole("button", { name: /trends/i });
-    expect(within(trendsCard).getByText("↑ 12.8%")).toBeInTheDocument();
-    expect(within(trendsCard).getByText(/up 12.8% vs jun/i)).toBeInTheDocument();
+    expect(within(trendsCard).queryByText(/12.8%/)).not.toBeInTheDocument();
 
     const pricesCard = screen.getByRole("button", { name: /price watch/i });
     expect(within(pricesCard).getByText("Apples")).toBeInTheDocument();

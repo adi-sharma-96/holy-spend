@@ -85,12 +85,8 @@ export function InlineLauncher({
   const trendPoints =
     dashboard?.spend_trend.filter((point) => point.currency === defaultTotal?.currency) || [];
   const latestTrend = trendPoints[trendPoints.length - 1];
-  const previousTrend = trendPoints[trendPoints.length - 2];
-  const trendDeltaPercent =
-    latestTrend && previousTrend && Number(previousTrend.amount) > 0
-      ? ((Number(latestTrend.amount) - Number(previousTrend.amount)) / Number(previousTrend.amount)) *
-        100
-      : undefined;
+  const comparison = defaultTotal?.comparison;
+  const exactProteinCost = nutritionSummary?.protein_cost?.groups.find((group) => group.match_type === "exact");
   const trendMaximum = Math.max(...trendPoints.map((point) => Number(point.amount)), 1);
   const avgPerDay =
     dashboard && defaultTotal
@@ -330,15 +326,9 @@ export function InlineLauncher({
                 <span>
                   <Icon name="chart" size={16} /> Trends
                 </span>
-                {trendDeltaPercent !== undefined ? (
-                  <span className={`inline-trend-badge ${trendDeltaPercent >= 0 ? "up" : "down"}`}>
-                    {trendDeltaPercent >= 0 ? "↑" : "↓"} {percent(trendDeltaPercent)}
-                  </span>
-                ) : (
-                  <Icon name="chevron" size={15} />
-                )}
+                <Icon name="chevron" size={15} />
               </span>
-              <span className="inline-mini-trend" aria-label="Six-month spending chart">
+              <span className="inline-mini-trend" aria-label="Recorded monthly spending through the selected date">
                 {trendPoints.map((point, index) => (
                   <span
                     className={index === trendPoints.length - 1 ? "current" : ""}
@@ -356,13 +346,13 @@ export function InlineLauncher({
               <span className="inline-feature-signal">
                 {latestTrend ? (
                   <>
-                    {latestTrend.label} · <strong>{money(latestTrend.amount, latestTrend.currency)}</strong>
-                    {trendDeltaPercent !== undefined && previousTrend && (
-                      <>
-                        {" "}
-                        · {trendDeltaPercent >= 0 ? "up" : "down"} {percent(trendDeltaPercent)} vs{" "}
-                        {previousTrend.label}
-                      </>
+                    {latestTrend.period_end ? "Through " + compactDate(latestTrend.period_end) : latestTrend.label} · <strong>{money(latestTrend.amount, latestTrend.currency)}</strong>
+                    {comparison && defaultTotal && (
+                      <small>
+                        {dashboard.window.label} comparison · {money(comparison.current_amount, defaultTotal.currency)}
+                        {" vs "}{money(comparison.previous_amount, defaultTotal.currency)}
+                        {" · "}{comparison.delta_percent == null ? comparison.label : percent(comparison.delta_percent)}
+                      </small>
                     )}
                   </>
                 ) : (
@@ -545,6 +535,12 @@ export function InlineLauncher({
                         <strong>{Math.round(Number(nutritionSummary.coverage_percent))}%</strong>
                         <small>Coverage</small>
                       </span>
+                      {exactProteinCost?.cost_per_100g != null && (
+                        <span>
+                          <small>Protein · exact</small>
+                          <strong>{money(exactProteinCost.cost_per_100g, nutritionSummary.currency)} / 100 g</strong>
+                        </span>
+                      )}
                       <span>
                         <strong>
                           {nutritionSummary.matched_item_count}/{nutritionSummary.total_item_count}

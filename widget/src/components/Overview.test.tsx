@@ -76,7 +76,7 @@ describe("Overview", () => {
     );
 
     expect(screen.getByRole("heading", { name: /where it went/i })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /last six months/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /recorded monthly spending/i })).not.toBeInTheDocument();
     expect(screen.getByText("Cinema")).toBeInTheDocument();
     const rowIcons = document.querySelectorAll(".category-row-symbol");
     const groceriesIcon = rowIcons[0]?.querySelector("svg");
@@ -89,7 +89,7 @@ describe("Overview", () => {
     expect(screen.queryByRole("heading", { name: /where it went/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: /trends/i }));
-    expect(screen.getByRole("heading", { name: /last six months/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /recorded monthly spending/i })).toBeInTheDocument();
     expect(screen.getByText("Feb")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: /price watch/i }));
@@ -188,7 +188,7 @@ describe("Overview", () => {
     fireEvent.click(screen.getByRole("tab", { name: /nutrition/i }));
     expect(screen.getByRole("heading", { name: "Nutrition" })).toBeInTheDocument();
     expect(screen.getByText(/your spend-weighted basket grade: b/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 of 2 grocery items matched/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 grocery products matched/i)).toBeInTheDocument();
 
     expect(screen.getByLabelText("Dashboard period")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^year$/i }));
@@ -331,9 +331,9 @@ describe("Overview", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: /last six months/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /recorded monthly spending/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Calendar" }));
-    expect(screen.queryByRole("heading", { name: /last six months/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /recorded monthly spending/i })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /july 2026/i })).toBeInTheDocument();
 
     const dayButton = screen.getByRole("button", {

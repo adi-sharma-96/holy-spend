@@ -102,7 +102,7 @@ describe("NutritionPanel", () => {
     );
 
     expect(screen.getByText(/your spend-weighted basket grade: a/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 of 2 grocery items matched/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 grocery products matched/i)).toBeInTheDocument();
     expect(screen.getByText("Mostly whole foods")).toBeInTheDocument();
   });
 

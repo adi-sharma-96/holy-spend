@@ -48,24 +48,39 @@ def _evidence(name: str, unit: str, *, measured: bool = True) -> dict[str, Any]:
     }
 
 
+COVERAGE = {
+    "id": USER_ID, "currency": "CAD", "kind": "tracking",
+    "start_date": date(2026, 1, 1), "end_date": None,
+    "reason": "Synthetic complete ledger", "recorded_at": "2026-07-01T00:00:00Z",
+}
+
+
 class FakeDashboardConn:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def execute(self, sql: str, params: dict[str, Any]) -> FakeResult:
         self.calls.append((sql, params))
+        if "spending:coverage" in sql:
+            return FakeResult([COVERAGE])
         if "dashboard:profile" in sql:
             return FakeResult([{"display_name": "Adi", "default_currency": "CAD"}])
         if "dashboard:totals" in sql:
             return FakeResult(
                 [
                     {
+                        "classification": "ordinary",
                         "currency": "CAD",
+                        "current_count": 1,
+                        "previous_count": 1,
                         "current_amount": Decimal("325.40"),
                         "previous_amount": Decimal("280.00"),
                     },
                     {
+                        "classification": "unreviewed",
                         "currency": "USD",
+                        "current_count": 1,
+                        "previous_count": 1,
                         "current_amount": Decimal("40.00"),
                         "previous_amount": Decimal("0"),
                     },
@@ -81,6 +96,8 @@ class FakeDashboardConn:
                         "taxonomy_level_name": "Group",
                         "has_children": True,
                         "currency": "CAD",
+                        "current_count": 1,
+                        "previous_count": 1,
                         "current_amount": Decimal("200"),
                         "previous_amount": Decimal("150"),
                     },
@@ -91,6 +108,8 @@ class FakeDashboardConn:
                         "taxonomy_level_name": "Group",
                         "has_children": True,
                         "currency": "CAD",
+                        "current_count": 1,
+                        "previous_count": 1,
                         "current_amount": Decimal("50"),
                         "previous_amount": Decimal("70"),
                     },
@@ -262,6 +281,8 @@ class FakeDashboardConnWithZeroCategory(FakeDashboardConn):
                         "taxonomy_level_name": "Group",
                         "has_children": True,
                         "currency": "CAD",
+                        "current_count": 1,
+                        "previous_count": 1,
                         "current_amount": Decimal("200"),
                         "previous_amount": Decimal("150"),
                     },
@@ -272,6 +293,8 @@ class FakeDashboardConnWithZeroCategory(FakeDashboardConn):
                         "taxonomy_level_name": "Group",
                         "has_children": False,
                         "currency": "CAD",
+                        "current_count": 1,
+                        "previous_count": 1,
                         "current_amount": Decimal("0"),
                         "previous_amount": Decimal("40"),
                     },
@@ -287,8 +310,13 @@ class FakeMerchantConn:
 
     def execute(self, sql: str, params: dict[str, Any]) -> FakeResult:
         self.calls.append((sql, params))
+        if "spending:coverage" in sql:
+            return FakeResult([COVERAGE])
         if "dashboard:merchants" in sql:
-            return FakeResult(self.rows)
+            return FakeResult([
+                {**row, "current_count": row["visit_count"], "previous_count": int(row["previous_amount"] != 0)}
+                for row in self.rows
+            ])
         raise AssertionError(f"Unexpected SQL: {sql}")
 
 
@@ -408,7 +436,7 @@ def test_dashboard_keeps_currencies_separate_and_builds_focused_insights() -> No
     assert response.price_changes[2].identity_key == "product:gala-apples"
     assert len(response.insights) == 3
     for sql, params in conn.calls:
-        assert params["user_id"] == USER_ID
+        assert params.get("user_id", params.get("user")) == USER_ID
         if "dashboard:totals" in sql or "dashboard:categories" in sql:
             assert "t.status = 'confirmed'" in sql
         if "dashboard:categories" in sql:
@@ -509,6 +537,8 @@ def test_merchant_breakdown_computes_deltas_and_drops_zero_current_rows() -> Non
 
     assert response.currency == "CAD"
     for sql, params in conn.calls:
+        if "spending:coverage" in sql:
+            continue
         assert params["currency"] == "CAD"
         assert "t.status = 'confirmed'" in sql
 

@@ -466,6 +466,8 @@ class FakeSummaryConn:
     def execute(self, sql: str, params: dict[str, Any] | None = None) -> FakeCursor:
         if "from nutrition_lookups" in sql:
             return FakeCursor(rows=self.matched_rows)
+        if "nutrition:protein-lines" in sql:
+            return FakeCursor(rows=[])
         if "from transaction_items item" in sql:
             self._grocery_call_count += 1
             rows = self.current_rows if self._grocery_call_count == 1 else self.previous_rows

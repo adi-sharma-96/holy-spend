@@ -177,6 +177,15 @@ $$;
 
 do $$
 begin
+    if to_regclass('public.spending_coverage_declarations') is not null then
+        grant select, insert, delete on table public.spending_coverage_declarations to expense_app;
+        grant select, insert on table public.spending_classification_reviews to expense_app;
+    end if;
+
+    if to_regclass('public.tracker_launch_credentials') is not null then
+        grant select, insert, delete on tracker_launch_credentials, tracker_browser_sessions to expense_app;
+    end if;
+
     if to_regclass('public.personal_access_tokens') is not null then
         revoke all on table public.personal_access_tokens from expense_app;
         grant insert, update on table public.personal_access_tokens to expense_app;

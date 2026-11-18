@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     local_timezone: str = "America/New_York"
     auth_mode: Literal["pat", "single_user"] = "single_user"
     owner_user_id: UUID | None = None
+    hosted_tracker_origin: HttpUrl | None = None
+    hosted_tracker_read_database_url: SecretStr | None = None
     mcp_enabled: bool = False
     mcp_allowed_hosts: str = "127.0.0.1:*,localhost:*"
     mcp_allowed_origins: str = ""
@@ -89,6 +91,26 @@ class Settings(BaseSettings):
     # https://fdc.nal.usda.gov/api-key-signup.html raises that substantially.
     usda_fdc_api_key: SecretStr = Field(default=SecretStr("DEMO_KEY"))
     nutrition_lookup_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
+
+    @field_validator("hosted_tracker_origin")
+    @classmethod
+    def validate_tracker_origin(cls, value: HttpUrl | None) -> HttpUrl | None:
+        if value is not None and (
+            value.scheme != "https" or value.path not in {"", "/"} or value.query is not None
+            or value.fragment is not None or value.username is not None or value.password is not None
+        ):
+            raise ValueError("HOSTED_TRACKER_ORIGIN must be a bare HTTPS origin")
+        return value
+
+    @model_validator(mode="after")
+    def validate_tracker_settings(self) -> "Settings":
+        if self.hosted_tracker_origin is not None and (self.owner_user_id is None or self.owner_user_id.int == 0):
+            raise ValueError("Hosted tracker requires OWNER_USER_ID")
+        if self.hosted_tracker_read_database_url is not None and (
+            self.hosted_tracker_origin is None or self.mcp_enabled
+        ):
+            raise ValueError("Configure the hosted tracker reader on the web service with HOSTED_TRACKER_ORIGIN")
+        return self
 
     @field_validator("local_timezone")
     @classmethod

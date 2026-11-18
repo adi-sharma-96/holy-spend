@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { compactDate, humanizeToken, money } from "../format";
 import { Icon } from "../icons";
 import { NutritionFactsDrawer, displayNumber, scaled } from "./NutritionFactsDrawer";
-import type { NutritionItem, NutritionSummary } from "../types";
+import type { NutritionItem, NutritionSummary, ProteinCostSummary } from "../types";
 
 function displayShare(value: string | number): number {
   return Number(value);
@@ -92,6 +93,72 @@ function GradeTile({
   );
 }
 
+function ProteinCost({ summary, currency, onReview, onPage }: {
+  summary: ProteinCostSummary;
+  currency: string;
+  onReview?: () => void;
+  onPage?: (offset: number) => void;
+}) {
+  const hasReviewableEvidence = Object.keys(summary.reasons).some((reason) => reason.startsWith("unverified_")
+    || reason === "missing_physical_quantity");
+  return (
+    <section className="protein-cost" aria-label="Cost per 100 g protein">
+      <h3>Cost per 100 g of purchased protein</h3>
+      {summary.groups.map((group) => (
+        <p key={group.match_type}>
+          <strong>{group.match_type === "exact" ? "Exact matches" : "Generic estimates"}</strong>{" · "}
+          {group.cost_per_100g == null ? "No eligible lines" : (
+            <>{money(group.cost_per_100g, currency)} per 100 g · {group.eligible_count} of {summary.total_count} lines · {money(group.eligible_spend, currency)}</>
+          )}
+        </p>
+      ))}
+      <p>
+        {summary.excluded_count} of {summary.total_count} lines excluded ({money(summary.excluded_spend, currency)} of {money(summary.total_spend, currency)}).
+        {" "}{summary.denominator}.
+      </p>
+      {summary.lines.length > 0 && (
+        <details>
+          <summary>Purchase evidence and exclusions</summary>
+          <ul>
+            {summary.lines.map((line) => (
+              <li key={line.item_id}>
+                <strong>{line.display_name}</strong> · {compactDate(line.purchase_date)} · {money(line.price_amount, currency)}
+                {" "}({humanizeToken(line.price_source, "purchase record")})
+                {line.purchase_quantity != null && <> · {displayNumber(Number(line.purchase_quantity))} {line.purchase_unit} purchased</>}
+                {line.exclusion_reason
+                  ? <> · {humanizeToken(line.exclusion_reason, "Excluded")}</>
+                  : <> · {displayNumber(Number(line.purchased_protein_g))} g protein · {money(line.cost_per_100g!, currency)} per 100 g ({line.match_type})</>}
+                {line.nutrition_source && (
+                  <small className="spending-comparison-note">
+                    {line.nutrition_source} {line.nutrition_source_ref}
+                    {line.nutrition_recorded_at && <> · recorded {line.nutrition_recorded_at.slice(0, 10)}</>}
+                    {line.protein_label && <>
+                      {" · "}{line.protein_label.protein_g} g protein {humanizeToken(line.protein_label.basis)}
+                      {line.protein_label.serving_size_g && <> ({line.protein_label.serving_size_g} g serving)</>}
+                      {line.protein_label.source_date && <> · label dated {line.protein_label.source_date}</>}
+                    </>}
+                  </small>
+                )}
+              </li>
+            ))}
+          </ul>
+          {onPage && <div className="view-toggle" aria-label="Purchase evidence pages">
+            {summary.detail_offset > 0 && (
+              <button type="button" onClick={() => onPage(Math.max(0, summary.detail_offset - 25))}>Previous lines</button>
+            )}
+            {summary.detail_offset + summary.lines.length < summary.total_count && (
+              <button type="button" onClick={() => onPage(summary.detail_offset + 25)}>More lines</button>
+            )}
+          </div>}
+        </details>
+      )}
+      {onReview && hasReviewableEvidence && (
+        <button type="button" className="text-button" onClick={onReview}>Open product match review</button>
+      )}
+    </section>
+  );
+}
+
 export function NutritionPanel({
   summary,
   status,
@@ -99,6 +166,8 @@ export function NutritionPanel({
   selectedItem,
   onSelectItem,
   onCloseItem,
+  onReview,
+  onProteinEvidencePage,
 }: {
   summary?: NutritionSummary;
   status: "idle" | "loading" | "ready" | "error";
@@ -106,6 +175,8 @@ export function NutritionPanel({
   selectedItem?: NutritionItem;
   onSelectItem: (item: NutritionItem) => void;
   onCloseItem: () => void;
+  onReview?: () => void;
+  onProteinEvidencePage?: (offset: number) => void;
 }) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"100g" | "serving">("100g");
@@ -144,6 +215,10 @@ export function NutritionPanel({
         <h2>Nutrition</h2>
       </div>
 
+      {summary.protein_cost && (
+        <ProteinCost summary={summary.protein_cost} currency={summary.currency} onReview={onReview} onPage={onProteinEvidencePage} />
+      )}
+
       {summary.total_item_count > 0 ? (
         <>
           <div className="nutrition-hero">
@@ -157,8 +232,8 @@ export function NutritionPanel({
                   : "Building your basket grade"}
               </h1>
               <p>
-                Weighted by spend, from {summary.matched_item_count} of {summary.total_item_count} grocery items
-                matched — your own basket's composite, not an official per-product Nutri-Score.
+                {summary.matched_item_count} of {summary.total_item_count} grocery products matched.
+                The basket grade weights products with a grade by spend.
               </p>
             </div>
           </div>

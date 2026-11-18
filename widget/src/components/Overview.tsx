@@ -54,6 +54,7 @@ type LoadStatus = "idle" | "loading" | "ready" | "error";
 
 type Props = {
   dashboard: ExpenseDashboard;
+  readOnly?: boolean;
   period: DashboardPeriod;
   section: TrackerSection;
   initialTrendView?: "months" | "calendar";
@@ -67,8 +68,11 @@ type Props = {
   onRefresh: () => void;
   onLoadTransactions: (loadMore?: boolean) => void;
   onActivityFilterChange?: (filter: "all" | "draft" | "confirmed") => void;
-  onAdd: () => void;
-  onReview: () => void;
+  onAdd?: () => void;
+  onReview?: () => void;
+  onInspectSpending?: (currency: string) => void;
+  onNutritionCurrencyChange?: (currency: string) => void;
+  onProteinEvidencePage?: (offset: number) => void;
   onLoadCategoryBreakdown: (
     parent: DashboardCategory,
     currency: string,
@@ -111,10 +115,11 @@ function SpendTrend({
   const latest = points[points.length - 1];
 
   return (
-    <section className="surface trend-panel" aria-label={`Six month ${currency} spending trend`}>
+    <section className="surface trend-panel" aria-label={`Recorded monthly ${currency} spending`}>
       <div className="panel-heading">
         <div>
-          <h3>Last six months</h3>
+          <h3>Recorded monthly spending</h3>
+          {latest?.period_end && <small>Current month through {compactDate(latest.period_end)}</small>}
           {latest && (
             <strong className="trend-latest">{money(latest.amount, latest.currency)}</strong>
           )}
@@ -138,7 +143,11 @@ function SpendTrend({
             <div
               className={`trend-column ${index === points.length - 1 ? "current" : ""}`}
               key={`${point.currency}-${point.period_start}`}
-              title={`${point.label}: ${money(point.amount, point.currency)}`}
+              title={[
+                point.period_end ? `${compactDate(point.period_start)}–${compactDate(point.period_end)}` : point.label,
+                money(point.amount, point.currency),
+                point.unknown_days ? `${point.unknown_days} days with unknown coverage` : "",
+              ].filter(Boolean).join(" · ")}
             >
               <span className="trend-value">{money(point.amount, point.currency)}</span>
               <span className="trend-bar-track">
@@ -146,7 +155,10 @@ function SpendTrend({
                   style={{ height: `${Math.max(8, (Number(point.amount) / maximum) * 100)}%` }}
                 />
               </span>
-              <small>{point.label}</small>
+              <small>
+                {point.label}{index === points.length - 1 && point.period_end ? " to date" : ""}
+                {Boolean(point.unknown_days) && <span aria-label="Coverage unknown"> *</span>}
+              </small>
             </div>
           ))}
         </div>
@@ -156,6 +168,9 @@ function SpendTrend({
           <strong>No monthly trend for {currency} yet</strong>
           <span>Confirmed expenses will build this view month by month.</span>
         </div>
+      )}
+      {points.some((point) => Boolean(point.unknown_days)) && (
+        <small className="spending-comparison-note">* Some days have unknown tracking coverage.</small>
       )}
     </section>
   );
@@ -352,6 +367,19 @@ function SpendCalendar({
         </div>
       )}
     </section>
+  );
+}
+
+function SpendComparisonNote({ comparison, currency }: {
+  comparison?: import("../types").SpendingComparison | null;
+  currency: string;
+}) {
+  if (!comparison) return null;
+  return (
+    <small className="spending-comparison-note">
+      Previous {money(comparison.previous_amount, currency)}
+      {comparison.delta_percent == null ? ` · ${comparison.label}` : ""}
+    </small>
   );
 }
 
@@ -818,7 +846,7 @@ function MerchantBreakdownPanel({
               {Number(merchant.share_percent).toFixed(0) !== "0" && (
                 <span>{Number(merchant.share_percent).toFixed(0)}%</span>
               )}
-              <Delta value={merchant.delta_percent} suffix="" />
+              {(!merchant.comparison || merchant.delta_percent != null) && <Delta value={merchant.delta_percent} suffix="" />}
             </span>
             <Icon name="chevron" size={14} />
           </span>
@@ -913,7 +941,7 @@ function TransactionRow({
 }: {
   transaction: ExpenseTransaction;
   onOpen: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 }) {
   const [revealed, setRevealed] = useState(false);
   const touchStart = useRef<number | undefined>(undefined);
@@ -932,7 +960,7 @@ function TransactionRow({
       onTouchEnd={(event) => {
         const start = touchStart.current;
         const end = event.changedTouches[0]?.clientX;
-        if (start === undefined || end === undefined) return;
+        if (!onDelete || start === undefined || end === undefined) return;
         if (start - end > 40) setRevealed(true);
         if (end - start > 40) setRevealed(false);
       }}
@@ -955,7 +983,7 @@ function TransactionRow({
       </strong>
       <Icon name="chevron" size={17} />
     </button>
-      <button
+      {onDelete && <button
         className="row-delete-action"
         type="button"
         onClick={onDelete}
@@ -963,7 +991,7 @@ function TransactionRow({
       >
         <Icon name="trash" size={16} />
         {transaction.status === "draft" ? "Discard" : "Delete"}
-      </button>
+      </button>}
     </div>
   );
 }
@@ -1000,6 +1028,7 @@ function PeriodToolbar({
 
 export function Overview({
   dashboard,
+  readOnly = false,
   period,
   section,
   initialTrendView,
@@ -1015,6 +1044,9 @@ export function Overview({
   onActivityFilterChange = () => undefined,
   onAdd,
   onReview,
+  onInspectSpending,
+  onNutritionCurrencyChange,
+  onProteinEvidencePage,
   onLoadCategoryBreakdown,
   onOpenTransaction,
   onDeleteTransaction = () => undefined,
@@ -1172,18 +1204,43 @@ export function Overview({
                   <DisplayAmount value={money(activeTotal.current_amount, activeTotal.currency)} />
                 </strong>
                 <div className="hero-meta">
-                  {Number(activeTotal.current_amount) !== 0 && (
+                  {activeTotal.delta_percent != null && (
                     <Delta
                       value={activeTotal.delta_percent}
                       suffix={previousWindowLabel(dashboard.window)}
                     />
                   )}
-                  {dashboard.needs_review_count > 0 && (
+                  {onReview && dashboard.needs_review_count > 0 && (
                     <button className="review-chip" onClick={onReview} type="button">
                       <span>{dashboard.needs_review_count}</span> to review
                     </button>
                   )}
                 </div>
+                <SpendComparisonNote comparison={activeTotal.comparison} currency={activeTotal.currency} />
+                {Boolean(activeTotal.buckets?.length) && (
+                  <dl className="spending-buckets">
+                    {activeTotal.buckets?.map((bucket) => (
+                      <div key={bucket.classification}>
+                        <dt>{bucket.classification}</dt>
+                        <dd>{money(bucket.current_amount, activeTotal.currency)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {onInspectSpending && (
+                  <button type="button" className="text-button" onClick={() => onInspectSpending(activeTotal.currency)}>
+                    Included transactions
+                  </button>
+                )}
+                {activeTotal.ordinary_comparison && (
+                  <div className="ordinary-comparison">
+                    <strong>Ordinary spending</strong>{" "}
+                    {activeTotal.ordinary_comparison.delta_percent != null && (
+                      <Delta value={activeTotal.ordinary_comparison.delta_percent} suffix={previousWindowLabel(dashboard.window)} />
+                    )}
+                    <SpendComparisonNote comparison={activeTotal.ordinary_comparison} currency={activeTotal.currency} />
+                  </div>
+                )}
               </>
             ) : (
               <div className="empty-state compact">
@@ -1309,7 +1366,10 @@ export function Overview({
                         {Number(category.share_percent).toFixed(0) !== "0" && (
                           <span>{Number(category.share_percent).toFixed(0)}%</span>
                         )}
-                        <Delta value={category.delta_percent} suffix="" />
+                        {!breakdown && category.category_slug !== "adjustments.taxes_fees"
+                          && (!category.comparison || category.delta_percent != null)
+                          && <Delta value={category.delta_percent} suffix="" />}
+                        <SpendComparisonNote comparison={category.comparison} currency={category.currency} />
                       </div>
                       {category.has_children && <Icon name="chevron" size={14} />}
                     </div>
@@ -1410,11 +1470,13 @@ export function Overview({
         >
           <div className="panel-heading transaction-heading">
             <h2>Activity</h2>
-            <button className="text-button" onClick={onAdd} type="button">
-              <Icon name="add" size={16} /> Add
-            </button>
+            {onAdd && (
+              <button className="text-button" onClick={onAdd} type="button">
+                <Icon name="add" size={16} /> Add
+              </button>
+            )}
           </div>
-          <ReceiptBatchPanel batchId={receiptBatchId} onBatchIdChange={onReceiptBatchIdChange} />
+          {!readOnly && <ReceiptBatchPanel batchId={receiptBatchId} onBatchIdChange={onReceiptBatchIdChange} />}
           <div className="activity-filters" aria-label="Activity filters">
             {(["all", "draft", "confirmed"] as const).map((filter) => (
               <button
@@ -1452,17 +1514,18 @@ export function Overview({
                     key={transaction.id}
                     transaction={transaction}
                     onOpen={() => onOpenTransaction(transaction)}
-                    onDelete={() => setConfirmTarget(transaction)}
+                    onDelete={readOnly ? undefined : () => setConfirmTarget(transaction)}
                   />
                 ))}
                 {!listedTransactions.length && (
                   <div className="empty-state">
                     <Icon name="receipt" />
                     <strong>No expenses yet</strong>
-                    <span>Scan a receipt or add one manually.</span>
-                    <button className="primary-button small" onClick={onAdd} type="button">
-                      Add your first expense
-                    </button>
+                    {onAdd && (
+                      <button className="primary-button small" onClick={onAdd} type="button">
+                        Add your first expense
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1584,9 +1647,24 @@ export function Overview({
           role="tabpanel"
         >
           <PeriodToolbar period={period} onPeriodChange={onPeriodChange} onRefresh={onRefresh} />
+          {onNutritionCurrencyChange && dashboard.totals.length > 1 && (
+            <div className="trend-currencies" aria-label="Nutrition currency">
+              {dashboard.totals.map((total) => (
+                <button
+                  type="button" key={total.currency}
+                  className={(nutritionSummary?.currency || dashboard.default_currency) === total.currency ? "active" : ""}
+                  onClick={() => onNutritionCurrencyChange(total.currency)}
+                >
+                  {total.currency}
+                </button>
+              ))}
+            </div>
+          )}
           <NutritionPanel
             currency={currency}
             onCloseItem={onCloseNutritionItem}
+            onProteinEvidencePage={onProteinEvidencePage}
+            onReview={onReview}
             onSelectItem={onOpenNutritionItem}
             selectedItem={nutritionItem}
             status={nutritionStatus}

@@ -1,4 +1,5 @@
 import { demoCallTool } from "./demo";
+import { TRACKER_PATH } from "./hosted-data";
 import { measureIntrinsicSize } from "./intrinsic-size";
 import type { HostContext, ToolResult } from "./types";
 
@@ -199,7 +200,8 @@ async function initializeBridge(): Promise<void> {
   }
 }
 
-const connection = isDemoMode ? Promise.resolve() : initializeBridge();
+const isStandaloneTracker = window.self === window.top && window.location.pathname === TRACKER_PATH;
+const connection = isDemoMode || isStandaloneTracker ? Promise.resolve() : initializeBridge();
 
 export function subscribeToToolResults(listener: (result: ToolResult) => void): () => void {
   listeners.add(listener);

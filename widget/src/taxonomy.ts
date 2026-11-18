@@ -1,3 +1,4 @@
+import type { AnalyticsQueryResponse, DashboardCategory } from "./types";
 import { TAXONOMY_V2 } from "./taxonomy.generated";
 
 type GeneratedTaxonomyNode = (typeof TAXONOMY_V2.nodes)[number];
@@ -44,4 +45,37 @@ export function taxonomyGroupLabel(stableKey: string): string | undefined {
   if (subcategory) return subcategory.name;
   if (node.parent_key) return nodesByKey.get(node.parent_key)?.name;
   return node.name;
+}
+
+
+export function dashboardCategoryBreakdown(
+  response: AnalyticsQueryResponse, parentKey: string, currency: string,
+): DashboardCategory[] {
+  const rows = response.rows
+    .map((row) => {
+      const stableKey = row.dimensions.category;
+      if (!stableKey || stableKey === parentKey || stableKey.startsWith("unclassified.")) {
+        return undefined;
+      }
+      const node = taxonomyNode(stableKey);
+      const amount = Number(row.metrics.total_spend || 0);
+      if (!node || !Number.isFinite(amount) || amount === 0) return undefined;
+      return { stableKey, node, amount };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  const total = rows.reduce((sum, row) => sum + row.amount, 0);
+  return rows
+    .sort((left, right) => right.amount - left.amount || left.node.name.localeCompare(right.node.name))
+    .map(({ stableKey, node, amount }) => ({
+      category_slug: stableKey,
+      category_name: node.name,
+      taxonomy_level: node.level,
+      taxonomy_level_name: taxonomyLevelName(node.level),
+      has_children: taxonomyHasChildren(stableKey),
+      currency,
+      current_amount: amount,
+      previous_amount: 0,
+      delta_percent: null,
+      share_percent: total ? (amount / total) * 100 : 0,
+    }));
 }

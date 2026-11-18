@@ -137,6 +137,12 @@ Cursor or anything else that speaks MCP: same shape, add a custom
 connector pointing at your `api` domain plus `/mcp`, OAuth, same client
 ID/secret from Step 2.
 
+If your host cannot render the widget, ask it to open the hosted tracker.
+When enabled by the instance owner, the chat returns a short-lived **Open
+tracker** link for read-only access. Spend comparisons use owner-declared
+coverage, and Nutrition separates exact protein-cost matches from generic
+estimates. See [self-hosting](docs/self-hosting.md) for setup.
+
 ## Step 4: Try it
 
 - "Open my expense tracker"

@@ -59,7 +59,7 @@ def test_single_resource_and_tool_surface_contract() -> None:
     tools = asyncio.run(server.list_tools())
     names = {tool.name for tool in tools}
 
-    assert len(tools) == 48
+    assert len(tools) == 53
     assert {
         "get_expense_taxonomy",
         "get_taxonomy_manifest",
@@ -70,6 +70,11 @@ def test_single_resource_and_tool_surface_contract() -> None:
         "get_expense",
         "get_expense_analytics",
         "get_expense_dashboard",
+        "get_spending_transactions",
+        "list_spending_coverage",
+        "declare_spending_coverage",
+        "remove_spending_coverage",
+        "review_spending_classification",
         "get_item_price_history",
         "get_product_review_queue",
         "list_product_corrections",

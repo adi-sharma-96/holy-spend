@@ -221,12 +221,105 @@ class DashboardWindow(BaseModel):
     previous_end: date
 
 
+class CoverageInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    currency: str
+    start_date: date
+    end_date: date | None = None
+    kind: Literal["tracking", "complete_import", "gap"]
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("currency")
+    @classmethod
+    def valid_currency(cls, value: str) -> str:
+        return normalize_currency(value)
+
+    @model_validator(mode="after")
+    def valid_interval(self) -> CoverageInput:
+        if self.end_date is None and self.kind != "tracking":
+            raise ValueError("Imports and gaps require an end date")
+        if self.end_date is not None and self.end_date < self.start_date:
+            raise ValueError("Coverage end precedes start")
+        return self
+
+
+class CoverageDeclaration(CoverageInput):
+    id: UUID
+    recorded_at: datetime
+
+
+class SpendingComparison(BaseModel):
+    currency: str
+    current_amount: Decimal
+    previous_amount: Decimal
+    window: DashboardWindow
+    current_count: int
+    previous_count: int
+    current_unknown_days: int
+    previous_unknown_days: int
+    current_basis: list[str]
+    previous_basis: list[str]
+    reasons: list[str]
+    label: str
+    delta_percent: Decimal | None = None
+
+
+SpendingClassification = Literal["ordinary", "exceptional", "unreviewed"]
+
+
+class SpendingBucket(BaseModel):
+    classification: SpendingClassification
+    current_amount: Decimal
+    previous_amount: Decimal
+    current_count: int
+    previous_count: int
+
+
+class SpendingTransaction(BaseModel):
+    id: UUID
+    transaction_date: date
+    revision: datetime
+    merchant: str | None
+    currency: str
+    transaction_type: TransactionType
+    amount: Decimal
+    classification: SpendingClassification
+    review_id: UUID | None
+    recurrence: list[str]
+
+
+class SpendingReviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    transaction_id: UUID
+    expected_revision: datetime
+    expected_review_id: UUID | None
+    classification: SpendingClassification
+    reason: str = Field(min_length=1, max_length=500)
+    explicit_approval: Literal[True]
+
+
+class SpendingReview(BaseModel):
+    id: UUID
+    transaction_id: UUID
+    transaction_revision: datetime
+    classification: SpendingClassification
+    reason: str
+    recorded_at: datetime
+
+
 class CurrencySpend(BaseModel):
     currency: str
     current_amount: Decimal
     previous_amount: Decimal
     delta_amount: Decimal
     delta_percent: Decimal | None = None
+    comparison: SpendingComparison | None = None
+
+
+    buckets: list[SpendingBucket] = Field(default_factory=list)
+    ordinary_comparison: SpendingComparison | None = None
 
 
 class CategorySpend(BaseModel):
@@ -239,6 +332,7 @@ class CategorySpend(BaseModel):
     current_amount: Decimal
     previous_amount: Decimal
     delta_percent: Decimal | None = None
+    comparison: SpendingComparison | None = None
     share_percent: Decimal
 
 
@@ -261,6 +355,7 @@ class MerchantSpend(BaseModel):
     current_amount: Decimal
     previous_amount: Decimal
     delta_percent: Decimal | None = None
+    comparison: SpendingComparison | None = None
     share_percent: Decimal
     visit_count: int
     average_amount: Decimal
@@ -274,6 +369,10 @@ class MerchantBreakdownResponse(BaseModel):
 
 class SpendTrendPoint(BaseModel):
     period_start: date
+    period_end: date | None = None
+    transaction_count: int = 0
+    unknown_days: int | None = None
+    coverage_basis: list[str] = Field(default_factory=list)
     label: str
     currency: str
     amount: Decimal
@@ -526,6 +625,26 @@ class SearchNutritionLookupsResponse(BaseModel):
 ROUNDING_TOLERANCE_G = 0.5
 
 
+class ProteinLabel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    basis: Literal["per_100g", "per_100ml", "per_serving"]
+    protein_g: Decimal = Field(ge=0, allow_inf_nan=False)
+    serving_size_g: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    product_identity_key: str | None = Field(default=None, min_length=1, max_length=200)
+    source_date: date | None = None
+    density_g_ml: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    density_source_ref: str | None = Field(default=None, min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_reference_basis(self) -> ProteinLabel:
+        if self.basis == "per_serving" and self.serving_size_g is None:
+            raise ValueError("A serving basis requires an observed mass per serving")
+        if (self.density_g_ml is None) != (self.density_source_ref is None):
+            raise ValueError("Density requires its own source reference")
+        return self
+
+
 class NutrimentsInput(BaseModel):
     """Values exactly as the source states them, in their natural label units (kcal, g,
     mg) - never pre-converted by the caller. `basis` says what amount those values are
@@ -614,6 +733,7 @@ class NutritionResultInput(BaseModel):
     source: str | None = Field(default=None, max_length=100)
     source_ref: str | None = Field(default=None, max_length=2000)
     nutriments: NutrimentsInput | None = None
+    protein_label: ProteinLabel | None = None
     nutriscore_grade: Literal["a", "b", "c", "d", "e"] | None = None
     nova_group: int | None = Field(default=None, ge=1, le=4)
     nova_group_estimated: bool = False
@@ -632,6 +752,19 @@ class NutritionResultInput(BaseModel):
     def validate_matched_has_provenance(self) -> NutritionResultInput:
         if self.matched and (not self.product_name or not self.source):
             raise ValueError("A matched result requires product_name and source for traceability")
+        if self.protein_label is not None and (not self.matched or not self.source_ref):
+            raise ValueError("Protein evidence requires a matched result and a source reference")
+        if (self.protein_label is not None and self.nutriments is not None
+                and self.nutriments.protein_g is not None):
+            label = self.protein_label
+            mass_basis = (
+                label.protein_g if label.basis == "per_100g" else
+                label.protein_g * 100 / label.serving_size_g
+                if label.basis == "per_serving" and label.serving_size_g is not None else None
+            )
+            stated = self.nutriments.to_per_100g()["protein_100g"]
+            if mass_basis is not None and abs(mass_basis - Decimal(str(stated))) > Decimal("0.01"):
+                raise ValueError("Protein label and nutrition facts disagree")
         return self
 
     @model_validator(mode="after")
@@ -649,7 +782,8 @@ class NutritionResultInput(BaseModel):
             if self.nutriments is not None
             else 0
         )
-        if present < MIN_NUTRISCORE_FIELDS_PRESENT and self.nutriscore_grade is None:
+        if (present < MIN_NUTRISCORE_FIELDS_PRESENT and self.nutriscore_grade is None
+                and (self.protein_label is None or self.nutriments is not None)):
             raise ValueError(
                 f"A matched result needs either a source-stated nutriscore_grade or at least "
                 f"{MIN_NUTRISCORE_FIELDS_PRESENT} of the 6 core macros used to compute a score "
@@ -670,6 +804,7 @@ class NutritionSummaryRequest(BaseModel):
 
     period: DashboardPeriod = DashboardPeriod.MONTH
     currency: str = Field(min_length=3, max_length=3)
+    protein_detail_offset: int = Field(default=0, ge=0)
 
     @field_validator("currency")
     @classmethod
@@ -728,6 +863,49 @@ class NutritionSignal(BaseModel):
     tone: Literal["neutral", "warn"] = "neutral"
 
 
+class ProteinCostLine(BaseModel):
+    item_id: UUID
+    transaction_id: UUID
+    purchase_date: date
+    display_name: str
+    currency: str
+    price_source: str
+    price_amount: Decimal
+    price_basis: str
+    price_basis_source: str
+    nutrition_source: str | None
+    nutrition_source_ref: str | None
+    nutrition_recorded_at: datetime | None
+    nutrition_lookup_id: UUID | None
+    match_type: Literal["exact", "generic"] | None
+    protein_label: ProteinLabel | None
+    purchase_quantity: Decimal | None
+    purchase_unit: str | None
+    purchased_protein_g: Decimal | None
+    cost_per_100g: Decimal | None
+    exclusion_reason: str | None
+
+
+class ProteinCostGroup(BaseModel):
+    match_type: Literal["exact", "generic"]
+    eligible_count: int
+    eligible_spend: Decimal
+    purchased_protein_g: Decimal
+    cost_per_100g: Decimal | None
+
+
+class ProteinCostSummary(BaseModel):
+    denominator: str = "Confirmed grocery purchase and refund lines, net of line discounts before tax and fees"
+    total_count: int
+    total_spend: Decimal
+    excluded_count: int
+    excluded_spend: Decimal
+    groups: list[ProteinCostGroup]
+    reasons: dict[str, int]
+    detail_offset: int
+    lines: list[ProteinCostLine]
+
+
 class NutritionSummary(BaseModel):
     window: DashboardWindow
     currency: str
@@ -739,6 +917,7 @@ class NutritionSummary(BaseModel):
     grade_distribution: list[NutritionGradeBucket] = Field(default_factory=list)
     signals: list[NutritionSignal] = Field(default_factory=list)
     groups: list[NutritionCategoryGroup] = Field(default_factory=list)
+    protein_cost: ProteinCostSummary | None = None
 
 
 class UsdaFoodCandidate(BaseModel):

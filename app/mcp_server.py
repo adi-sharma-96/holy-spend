@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID, uuid5
 
 from mcp.server.fastmcp import FastMCP
@@ -15,7 +15,7 @@ from app.analytics import AnalyticsQueryCompiler, AnalyticsRepository
 from app.application import ExpenseApplicationService
 from app.clock import local_today
 from app.config import Settings
-from app.dashboard import DashboardRepository
+from app.dashboard import DashboardRepository, dashboard_window
 from app.db import user_transaction
 from app.email_ingestion_repository import EmailIngestionRepository
 from app.errors import (
@@ -30,6 +30,7 @@ from app.errors import (
     UploadRateLimitError,
     ValidationReferenceError,
 )
+from app.hosted_tracker import mint_tracker_launch
 from app.models import (
     AdjustmentType,
     AliasResolveItem,
@@ -60,6 +61,9 @@ from app.plugin_models import (
     CheckEmailsProcessedResponse,
     ClaimEmailForProcessingRequest,
     ClaimEmailForProcessingResponse,
+    CoverageDeclaration,
+    CoverageInput,
+    DashboardPeriod,
     ExpenseCorrectionRequest,
     ExpenseDashboard,
     ExpenseDashboardRequest,
@@ -90,6 +94,9 @@ from app.plugin_models import (
     SearchKnownItemsResponse,
     SearchNutritionLookupsRequest,
     SearchNutritionLookupsResponse,
+    SpendingReview,
+    SpendingReviewInput,
+    SpendingTransaction,
     UsdaFoodCandidate,
     UsdaFoodSearchResponse,
     WidgetView,
@@ -120,6 +127,7 @@ from app.receipt_workflows import (
 )
 from app.reconciliation import has_blocking_issues, item_gross_total
 from app.repositories import TaxonomyRepository, TransactionRepository
+from app.spending import SpendingRepository
 from app.storage_dependencies import get_object_storage, get_upload_rate_limiter
 
 logger = logging.getLogger(__name__)
@@ -297,6 +305,7 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
             "guess either way. "
             "Call open_expense_tracker only when the user explicitly asks to open, review, edit, or browse the "
             "interactive tracker; receipt save, validation, and confirmation otherwise remain chat-only. "
+            "If the widget cannot render and the user wants a browser view, use open_hosted_tracker when available. "
             "Uploading, analyzing, or saving a draft is not approval; confirm only after explicit user approval. "
             "Classify every semantic line with an assignable Taxonomy v2 stable key. Use taxonomy search for "
             "candidate leaves and branch lookup for local context; never invent or embed category lists. "
@@ -544,7 +553,8 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
         title="Get expense analytics",
         description=(
             "Use this when you need confirmed-only spending totals, counts, quantities, averages, discounts, taxes, "
-            "fees, or refunds; monetary results are never combined across currencies."
+            "fees, or refunds. Monetary results stay in their recorded currencies. For a period-change percentage, "
+            "use the coverage decision returned by get_expense_dashboard."
         ),
         annotations=ToolAnnotations(
             readOnlyHint=True,
@@ -566,7 +576,9 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
         title="Get expense dashboard",
         description=(
             "Use this when you need the owner's focused spending overview, including period comparisons, "
-            "categories, review queue, recent transactions, and trustworthy unit-price changes."
+            "categories, review queue, recent transactions, and trustworthy unit-price changes. Use the server's "
+            "comparison labels and delta_percent only when present. Never derive a percent from recorded amounts "
+            "or compare the raw monthly bars. Use get_spending_transactions to inspect included transactions."
         ),
         annotations=ToolAnnotations(
             readOnlyHint=True,
@@ -587,6 +599,84 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
                     today=lambda: local_today(settings),
                     fallback_currency=settings.supported_currencies[0],
                 ).get_dashboard(request or ExpenseDashboardRequest())
+
+        return _safe(action)
+
+    @server.tool(annotations=ToolAnnotations(
+        readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False,
+    ))
+    def get_spending_transactions(
+        currency: str,
+        period: DashboardPeriod = DashboardPeriod.MONTH,
+        window: Literal["current", "previous"] = "current",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[SpendingTransaction]:
+        """Use this when inspecting spending rows and recurrence evidence before classification review."""
+        def action() -> list[SpendingTransaction]:
+            if not 1 <= limit <= 100 or offset < 0 or currency not in settings.supported_currencies:
+                raise ValueError("Use a supported currency, limit 1–100, and a non-negative offset")
+            principal = resolver.resolve()
+            dates = dashboard_window(period, local_today(settings))
+            start, end = (
+                (dates.current_start, dates.current_end) if window == "current"
+                else (dates.previous_start, dates.previous_end)
+            )
+            with user_transaction(principal.user_id) as conn:
+                return SpendingRepository(conn, principal.user_id).transactions(start, end, currency, limit, offset)
+
+        return _safe(action)
+
+    @server.tool(annotations=ToolAnnotations(
+        readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False,
+    ))
+    def list_spending_coverage() -> list[CoverageDeclaration]:
+        """Use this when inspecting declared tracking, complete imports and gaps in the ledger."""
+        def action() -> list[CoverageDeclaration]:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return SpendingRepository(conn, principal.user_id).declarations()
+
+        return _safe(action)
+
+    @server.tool(annotations=ToolAnnotations(
+        readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False,
+    ))
+    def declare_spending_coverage(request: CoverageInput, explicit_approval: Literal[True]) -> CoverageDeclaration:
+        """Use this when the owner explicitly attests ledger-wide coverage. Never infer it from receipts."""
+        def action() -> CoverageDeclaration:
+            if request.currency not in settings.supported_currencies or not explicit_approval:
+                raise ValueError("Owner approval and a supported currency are required")
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return SpendingRepository(conn, principal.user_id).declare(request)
+
+        return _safe(action)
+
+    @server.tool(annotations=ToolAnnotations(
+        readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False,
+    ))
+    def remove_spending_coverage(declaration_id: UUID, explicit_approval: Literal[True]) -> OperationResult:
+        """Use this when the owner explicitly approves removal of an incorrect coverage declaration."""
+        def action() -> OperationResult:
+            if not explicit_approval:
+                raise ValueError("Owner approval is required")
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                SpendingRepository(conn, principal.user_id).remove_declaration(declaration_id)
+            return OperationResult(message="Coverage declaration removed")
+
+        return _safe(action)
+
+    @server.tool(annotations=ToolAnnotations(
+        readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False,
+    ))
+    def review_spending_classification(request: SpendingReviewInput) -> SpendingReview:
+        """Use this when recording an owner-approved classification on an inspected revision."""
+        def action() -> SpendingReview:
+            principal = resolver.resolve()
+            with user_transaction(principal.user_id) as conn:
+                return SpendingRepository(conn, principal.user_id).classify(request)
 
         return _safe(action)
 
@@ -823,7 +913,9 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
             "get_nutrition_queue, after searching for its nutrition facts - or to correct an item that's already "
             "matched but wrong or thin (e.g. only a source-stated grade with no real macros behind it); look it "
             "up first with search_nutrition_lookups to get its id, since already-matched items never appear in "
-            "get_nutrition_queue again. item_id must be copied exactly from the id field of a real "
+            "get_nutrition_queue again. To enable protein cost, record protein_label from the original source basis "
+            "with its source_ref. Only set product_identity_key for a verified label for that exact product. "
+            "item_id must be copied exactly from the id field of a real "
             "get_nutrition_queue or search_nutrition_lookups result - never invent, guess, or reuse an id from a "
             "different run or a different item; if you're not looking at a real id from one of those two tools, "
             "call one of them again rather than fabricating one. "
@@ -998,7 +1090,10 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
         description=(
             "Use this when the owner wants to see how healthy their grocery basket is: a spend-weighted "
             "Nutri-Score-style grade, a grade distribution, processing-level signals, and category-grouped "
-            "items with full nutrition facts. Only matched items (status='matched') affect the grade; items "
+            "Protein cost uses eligible purchased quantities, with separate exact and generic results. "
+            "Use the included coverage and exclusion reasons. Use the product review workflow on the purchase "
+            "item or search_nutrition_lookups for a missing or stale source label. "
+            "Items with full nutrition facts. Only matched items (status='matched') affect the grade; items "
             "still queued for lookup (status='pending') or that a lookup already tried and couldn't match "
             "(status='no_match') are listed too but don't affect the grade."
         ),
@@ -1866,5 +1961,30 @@ def create_mcp_server(settings: Settings) -> FastMCP[None]:
             )
 
         return cast(WidgetView, _safe(action))
+
+    if settings.hosted_tracker_origin is not None:
+        @server.tool(
+            title="Open tracker in browser",
+            description=(
+                "Use this when the owner explicitly asks for the hosted tracker, including when this host "
+                "cannot display the widget. Return the Open tracker link verbatim. It opens a read-only HTTPS "
+                "tracker, works once, and expires in two minutes. Ask the owner to request a fresh link if it expires."
+            ),
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False,
+            ),
+        )
+        def open_hosted_tracker(explicit_approval: Literal[True]) -> CallToolResult:
+            def action() -> CallToolResult:
+                if not explicit_approval:
+                    raise ValueError("Owner approval is required")
+                principal = resolver.resolve()
+                url = mint_tracker_launch(principal.user_id, settings)
+                return CallToolResult(content=[TextContent(
+                    type="text",
+                    text=f"[Open tracker]({url}) · Read-only access. This link expires in two minutes.",
+                )])
+
+            return _safe(action)
 
     return server

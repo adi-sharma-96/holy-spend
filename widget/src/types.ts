@@ -126,11 +126,30 @@ export type ExpenseSnapshot = {
 
 export type DashboardPeriod = "month" | "30d" | "90d" | "year";
 
+export type SpendingComparison = {
+  current_amount: string | number;
+  previous_amount: string | number;
+  current_count: number;
+  previous_count: number;
+  current_unknown_days: number;
+  previous_unknown_days: number;
+  reasons: string[];
+  label: string;
+  delta_percent?: string | number | null;
+};
+
 export type DashboardTotal = {
+  ordinary_comparison?: SpendingComparison | null;
+  buckets?: Array<{
+    classification: "ordinary" | "exceptional" | "unreviewed";
+    current_amount: string | number;
+    previous_amount: string | number;
+  }>;
   currency: string;
   current_amount: string | number;
   previous_amount: string | number;
   delta_amount: string | number;
+  comparison?: SpendingComparison | null;
   delta_percent?: string | number | null;
 };
 
@@ -143,11 +162,15 @@ export type DashboardCategory = {
   currency: string;
   current_amount: string | number;
   previous_amount: string | number;
+  comparison?: SpendingComparison | null;
   delta_percent?: string | number | null;
   share_percent: string | number;
 };
 
 export type SpendTrendPoint = {
+  period_end?: string | null;
+  transaction_count?: number;
+  unknown_days?: number | null;
   period_start: string;
   label: string;
   currency: string;
@@ -227,6 +250,7 @@ export type MerchantSpend = {
   currency: string;
   current_amount: string | number;
   previous_amount: string | number;
+  comparison?: SpendingComparison | null;
   delta_percent?: string | number | null;
   share_percent: string | number;
   visit_count: number;
@@ -361,7 +385,42 @@ export type NutritionSignal = {
   tone: "neutral" | "warn" | string;
 };
 
+export type ProteinCostSummary = {
+  reasons: Record<string, number>;
+  detail_offset: number;
+  denominator: string;
+  total_count: number;
+  total_spend: string;
+  excluded_count: number;
+  excluded_spend: string;
+  groups: Array<{
+    match_type: "exact" | "generic";
+    eligible_count: number;
+    eligible_spend: string;
+    purchased_protein_g: string;
+    cost_per_100g: string | null;
+  }>;
+  lines: Array<{
+    item_id: string;
+    display_name: string;
+    purchase_date: string;
+    cost_per_100g: string | null;
+    price_amount: string;
+    price_source: string;
+    purchase_quantity: string | null;
+    purchase_unit: string | null;
+    purchased_protein_g: string | null;
+    match_type: "exact" | "generic" | null;
+    nutrition_source: string | null;
+    nutrition_source_ref: string | null;
+    nutrition_recorded_at: string | null;
+    protein_label: { protein_g: string; basis: string; serving_size_g: string | null; source_date?: string | null } | null;
+    exclusion_reason: string | null;
+  }>;
+};
+
 export type NutritionSummary = {
+  protein_cost?: ProteinCostSummary | null;
   window: {
     label: string;
     current_start: string;

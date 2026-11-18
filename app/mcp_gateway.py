@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from time import monotonic
 from typing import Annotated
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -71,6 +72,7 @@ def build_gateway_router(
     upstream_url: str,
     client: httpx.AsyncClient,
     use_google_id_token: bool = False,
+    hosted_owner_id: UUID | None = None,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -79,6 +81,8 @@ def build_gateway_router(
         request: Request,
         _user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     ) -> StreamingResponse:
+        if hosted_owner_id is not None and _user.user_id != hosted_owner_id:
+            raise HTTPException(status_code=403, detail="Hosted tracker requires the configured owner")
         started = monotonic()
         correlation = getattr(request.state, "auth_correlation_id", None) or correlation_id(
             request.headers.get("x-correlation-id")
@@ -89,6 +93,7 @@ def build_gateway_router(
 
         forwarded_headers = [
             (key, value) for key, value in request.headers.items() if key.lower() not in _EXCLUDED_REQUEST_HEADERS
+            and not (hosted_owner_id is not None and key.lower() == "cookie")
         ]
         if use_google_id_token:
             forwarded_headers.append(("authorization", f"Bearer {_google_id_token(upstream_url)}"))
@@ -127,6 +132,9 @@ def build_gateway_router(
             for key, value in upstream_response.headers.items()
             if key.lower() not in _EXCLUDED_RESPONSE_HEADERS
         }
+        if hosted_owner_id is not None:
+            response_headers["cache-control"] = "no-store"
+            response_headers["referrer-policy"] = "no-referrer"
         return StreamingResponse(
             _drain(upstream_response),
             status_code=upstream_response.status_code,

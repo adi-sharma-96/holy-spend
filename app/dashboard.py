@@ -31,12 +31,16 @@ from app.plugin_models import (
     PriceChange,
     SearchKnownItemsRequest,
     SearchKnownItemsResponse,
+    SpendingBucket,
+    SpendingClassification,
     SpendTrendPoint,
 )
 from app.price_watch import TRACKABLE_PREFIXES, canonical_price_watch_identity
 from app.product_evidence import decide_comparison, readiness_reasons
+from app.spending import SPENDING_REVIEW_JOIN, SpendingRepository, compare_spending, coverage_for_dates
 
 PERCENT_QUANTUM = Decimal("0.1")
+SPENDING_CLASSIFICATIONS: tuple[SpendingClassification, ...] = ("ordinary", "exceptional", "unreviewed")
 BASKET_WINDOW_DAYS = 180
 BASKET_MAX_PRODUCT_WEIGHT_SHARE = Decimal("0.35")
 BASKET_HIGH_CONFIDENCE_MIN_PRODUCTS = 8
@@ -166,10 +170,21 @@ class DashboardRepository:
             {"user_id": self.user_id},
         ).fetchone()
 
+        first_month_year, first_month = divmod(window.current_end.year * 12 + window.current_end.month - 6, 12)
+        first_chart_date = date(first_month_year, first_month + 1, 1)
+        declarations = SpendingRepository(self.conn, self.user_id).declarations(
+            min(window.previous_start, first_chart_date), window.current_end,
+        )
         total_rows = self.conn.execute(
-            """
+            f"""
             /* dashboard:totals */
-            select t.currency,
+            select t.currency, coalesce(spending_review.classification, 'unreviewed') as classification,
+                   count(distinct t.id) filter (
+                       where t.transaction_date between %(current_start)s and %(current_end)s
+                   ) as current_count,
+                   count(distinct t.id) filter (
+                       where t.transaction_date between %(previous_start)s and %(previous_end)s
+                   ) as previous_count,
                    coalesce(sum(case
                        when t.transaction_date between %(current_start)s and %(current_end)s
                            and t.transaction_type = 'expense' then t.total_amount
@@ -185,28 +200,50 @@ class DashboardRepository:
                        else 0
                    end), 0) as previous_amount
             from transactions t
+            {SPENDING_REVIEW_JOIN}
             where t.user_id = %(user_id)s
               and t.status = 'confirmed'
-              and t.transaction_date between %(previous_start)s and %(current_end)s
+              and (t.transaction_date between %(previous_start)s and %(previous_end)s
+                   or t.transaction_date between %(current_start)s and %(current_end)s)
               and t.transaction_type in ('expense', 'refund')
-            group by t.currency
+            group by t.currency, classification
             order by t.currency
             """,
             params,
         ).fetchall()
-        totals = []
+        by_currency: dict[str, dict[str, SpendingBucket]] = defaultdict(dict)
         for row in total_rows:
-            current = _decimal(row["current_amount"])
-            previous = _decimal(row["previous_amount"])
-            totals.append(
-                CurrencySpend(
-                    currency=row["currency"],
-                    current_amount=current,
-                    previous_amount=previous,
-                    delta_amount=current - previous,
-                    delta_percent=_percent_delta(current, previous),
+            bucket = SpendingBucket.model_validate(row)
+            by_currency[row["currency"]][bucket.classification] = bucket
+        default_currency = profile["default_currency"] if profile else self.fallback_currency
+        totals = []
+        for currency in sorted(set(by_currency) | {default_currency}):
+            recorded = by_currency[currency]
+            buckets = [
+                recorded.get(classification) or SpendingBucket(
+                    classification=classification, current_amount=Decimal(0), previous_amount=Decimal(0),
+                    current_count=0, previous_count=0,
                 )
+                for classification in SPENDING_CLASSIFICATIONS
+            ]
+            ordinary, _, unreviewed = buckets
+            current = sum((bucket.current_amount for bucket in buckets), Decimal(0))
+            previous = sum((bucket.previous_amount for bucket in buckets), Decimal(0))
+            comparison = compare_spending(
+                window, currency, current, previous,
+                sum(bucket.current_count for bucket in buckets), sum(bucket.previous_count for bucket in buckets),
+                declarations,
             )
+            ordinary_comparison = compare_spending(
+                window, currency, ordinary.current_amount, ordinary.previous_amount,
+                ordinary.current_count, ordinary.previous_count, declarations,
+                unreviewed=unreviewed.current_count + unreviewed.previous_count,
+            )
+            totals.append(CurrencySpend(
+                currency=currency, current_amount=current, previous_amount=previous,
+                delta_amount=current - previous, delta_percent=comparison.delta_percent, comparison=comparison,
+                buckets=buckets, ordinary_comparison=ordinary_comparison,
+            ))
 
         category_rows = self.conn.execute(
             """
@@ -223,6 +260,12 @@ class DashboardRepository:
                          and child.parent_id = reporting_category.id
                    ) as has_children,
                    t.currency,
+                   count(distinct t.id) filter (
+                       where t.transaction_date between %(current_start)s and %(current_end)s
+                   ) as current_count,
+                   count(distinct t.id) filter (
+                       where t.transaction_date between %(previous_start)s and %(previous_end)s
+                   ) as previous_count,
                    coalesce(sum(case
                        when t.transaction_date between %(current_start)s and %(current_end)s
                            and t.transaction_type = 'expense' then i.line_total_amount
@@ -308,6 +351,9 @@ class DashboardRepository:
                 if denominator
                 else Decimal("0")
             )
+            comparison = compare_spending(
+                window, currency, current, previous, row["current_count"], row["previous_count"], declarations,
+            )
             categories.append(
                 CategorySpend(
                     category_slug=row["category_slug"],
@@ -318,7 +364,8 @@ class DashboardRepository:
                     currency=currency,
                     current_amount=current,
                     previous_amount=previous,
-                    delta_percent=_percent_delta(current, previous),
+                    delta_percent=comparison.delta_percent,
+                    comparison=comparison,
                     share_percent=share,
                 )
             )
@@ -348,7 +395,6 @@ class DashboardRepository:
                     currency=currency,
                     current_amount=amount,
                     previous_amount=previous,
-                    delta_percent=_percent_delta(amount, previous),
                     share_percent=share,
                 )
             )
@@ -372,6 +418,8 @@ class DashboardRepository:
                   and transaction_type in ('expense', 'refund')
             )
             select months.period_start,
+                   least(%(current_end)s::date, (months.period_start + interval '1 month - 1 day')::date) as period_end,
+                   count(t.id) as transaction_count,
                    to_char(months.period_start, 'Mon') as label,
                    currencies.currency,
                    coalesce(sum(case
@@ -397,7 +445,15 @@ class DashboardRepository:
                 "current_end": window.current_end,
             },
         ).fetchall()
-        spend_trend = [SpendTrendPoint.model_validate(row) for row in trend_rows]
+        spend_trend = []
+        for row in trend_rows:
+            point = SpendTrendPoint.model_validate(row)
+            if point.period_end is not None:
+                point.unknown_days, point.coverage_basis = coverage_for_dates(
+                    point.period_start, point.period_end,
+                    (entry for entry in declarations if entry.currency == point.currency),
+                )
+            spend_trend.append(point)
 
         daily_rows = self.conn.execute(
             """
@@ -479,7 +535,7 @@ class DashboardRepository:
         insights = self._insights(totals, categories, price_changes, needs_review_count)
         return ExpenseDashboard(
             display_name=profile["display_name"] if profile else None,
-            default_currency=(profile["default_currency"] if profile else self.fallback_currency),
+            default_currency=default_currency,
             window=window,
             totals=totals,
             categories=categories,
@@ -502,11 +558,20 @@ class DashboardRepository:
             "previous_start": window.previous_start,
             "previous_end": window.previous_end,
         }
+        declarations = SpendingRepository(self.conn, self.user_id).declarations(
+            window.previous_start, window.current_end,
+        )
         rows = self.conn.execute(
             """
             /* dashboard:merchants */
             select coalesce(t.merchant_name_normalized, t.merchant_name_raw, 'Unknown merchant')
                        as merchant_name,
+                   count(distinct t.id) filter (
+                       where t.transaction_date between %(current_start)s and %(current_end)s
+                   ) as current_count,
+                   count(distinct t.id) filter (
+                       where t.transaction_date between %(previous_start)s and %(previous_end)s
+                   ) as previous_count,
                    coalesce(sum(case
                        when t.transaction_date between %(current_start)s and %(current_end)s
                            and t.transaction_type = 'expense' then t.total_amount
@@ -561,13 +626,17 @@ class DashboardRepository:
                 if visit_count
                 else Decimal("0")
             )
+            comparison = compare_spending(
+                window, request.currency, current, previous, row["current_count"], row["previous_count"], declarations,
+            )
             merchants.append(
                 MerchantSpend(
                     merchant_name=row["merchant_name"],
                     currency=request.currency,
                     current_amount=current,
                     previous_amount=previous,
-                    delta_percent=_percent_delta(current, previous),
+                    delta_percent=comparison.delta_percent,
+                    comparison=comparison,
                     share_percent=share,
                     visit_count=visit_count,
                     average_amount=average_amount,
@@ -964,7 +1033,7 @@ class DashboardRepository:
         if len(insights) < 3 and totals:
             total = max(totals, key=lambda candidate: abs(candidate.current_amount))
             if total.delta_percent is None:
-                detail = "No comparable spend was recorded in the previous period."
+                detail = total.comparison.label if total.comparison else "Tracking coverage is unavailable."
             else:
                 direction = "more" if total.delta_amount > 0 else "less"
                 detail = f"{abs(total.delta_percent):.1f}% {direction} than the previous period."
@@ -973,7 +1042,7 @@ class DashboardRepository:
                     kind="period",
                     title=f"{total.currency} {total.current_amount:.2f} this period",
                     detail=detail,
-                    tone="negative" if total.delta_amount > 0 else "positive",
+                    tone="neutral" if total.delta_percent is None else "attention",
                 )
             )
         return insights

@@ -17,7 +17,7 @@ import { ProductReviewPanel } from "./components/ProductReviewPanel";
 import { TransactionDetail } from "./components/TransactionDetail";
 import { draftFromSnapshot, emptyDraft, savePayload, type DraftForm } from "./draft";
 import { Icon } from "./icons";
-import { taxonomyHasChildren, taxonomyLevelName, taxonomyNode } from "./taxonomy";
+import { dashboardCategoryBreakdown } from "./taxonomy";
 import type {
   AnalyticsQueryResponse,
   Category,
@@ -304,33 +304,7 @@ export function App() {
         },
       });
       const response = structured<AnalyticsQueryResponse>(result);
-      const rows = response.rows
-        .map((row) => {
-          const stableKey = row.dimensions.category;
-          if (!stableKey || stableKey === parent.category_slug || stableKey.startsWith("unclassified.")) {
-            return undefined;
-          }
-          const node = taxonomyNode(stableKey);
-          const amount = Number(row.metrics.total_spend || 0);
-          if (!node || !Number.isFinite(amount) || amount === 0) return undefined;
-          return { stableKey, node, amount };
-        })
-        .filter((row): row is NonNullable<typeof row> => Boolean(row));
-      const total = rows.reduce((sum, row) => sum + row.amount, 0);
-      return rows
-        .sort((left, right) => right.amount - left.amount || left.node.name.localeCompare(right.node.name))
-        .map(({ stableKey, node, amount }) => ({
-          category_slug: stableKey,
-          category_name: node.name,
-          taxonomy_level: node.level,
-          taxonomy_level_name: taxonomyLevelName(node.level),
-          has_children: taxonomyHasChildren(stableKey),
-          currency,
-          current_amount: amount,
-          previous_amount: 0,
-          delta_percent: null,
-          share_percent: total ? (amount / total) * 100 : 0,
-        }));
+      return dashboardCategoryBreakdown(response, parent.category_slug, currency);
     },
     [],
   );
@@ -372,11 +346,11 @@ export function App() {
   );
 
   const loadNutritionSummary = useCallback(
-    async (currencyCode: string, periodValue: DashboardPeriod) => {
+    async (currencyCode: string, periodValue: DashboardPeriod, proteinOffset?: number) => {
       setNutritionStatus("loading");
       try {
         const result = await callTool("get_nutrition_summary", {
-          request: { currency: currencyCode, period: periodValue },
+          request: { currency: currencyCode, period: periodValue, protein_detail_offset: proteinOffset },
         });
         setNutritionSummary(structured<NutritionSummary>(result));
         setNutritionStatus("ready");
@@ -615,9 +589,9 @@ export function App() {
   // isn't known until the dashboard load itself resolves.
   useEffect(() => {
     if (dashboard && nutritionStatus === "idle") {
-      void loadNutritionSummary(dashboard.default_currency, period);
+      void loadNutritionSummary(nutritionSummary?.currency || dashboard.default_currency, period);
     }
-  }, [dashboard, loadNutritionSummary, nutritionStatus, period]);
+  }, [dashboard, loadNutritionSummary, nutritionStatus, nutritionSummary?.currency, period]);
 
   useEffect(() => {
     const refreshVisibleState = () => {
@@ -1031,13 +1005,13 @@ export function App() {
             onPeriodChange={(nextPeriod) => {
               void loadDashboard(nextPeriod);
               if (nutritionStatus !== "idle") {
-                void loadNutritionSummary(dashboard.default_currency, nextPeriod);
+                void loadNutritionSummary(nutritionSummary?.currency || dashboard.default_currency, nextPeriod);
               }
             }}
             onRefresh={() => {
               void loadDashboard(period);
               if (nutritionStatus !== "idle") {
-                void loadNutritionSummary(dashboard.default_currency, period);
+                void loadNutritionSummary(nutritionSummary?.currency || dashboard.default_currency, period);
               }
             }}
             onLoadTransactions={(loadMore) => void loadTransactions(loadMore)}
@@ -1049,6 +1023,10 @@ export function App() {
             }}
             onAdd={() => void launchManualEntry()}
             onReview={openReviewQueue}
+            onNutritionCurrencyChange={(currency) => void loadNutritionSummary(currency, period)}
+            onProteinEvidencePage={(offset) =>
+              void loadNutritionSummary(nutritionSummary?.currency || dashboard.default_currency, period, offset)
+            }
             onLoadCategoryBreakdown={loadCategoryBreakdown}
             onOpenTransaction={(transaction) => void openTransaction(transaction)}
             onDeleteTransaction={(transaction) => void deleteFromActivity(transaction)}

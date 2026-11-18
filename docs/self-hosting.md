@@ -217,3 +217,43 @@ lookup tools above over general web search.
 ## Backups and upgrades
 
 Back up Postgres and the private Storage bucket together. Apply new migrations before deploying application code that depends on them. Preserve `.env`, tunnel credentials, generated plugin bundles, and local marketplace files outside source control.
+
+### Optional read-only hosted tracker
+
+The public authenticated API gateway can serve the same compiled tracker as
+a standalone HTTPS page. The authenticated MCP action issues a one-use link
+that expires after two minutes. The cookie expires after 30 minutes. Ask the
+connected chat to open the hosted tracker again when either expires.
+
+1. Apply migrations 0038, 0039 and 0040 in order, after 0037.
+2. Run `supabase/bootstrap/002_hosted_tracker_reader.sql` as the database
+   administrator. Supply its reader password through the prompt or your secret
+   management tooling. The script creates the login once and reapplies the
+   read grants. Manage password rotation separately.
+3. Set `OWNER_USER_ID` and the same bare HTTPS `HOSTED_TRACKER_ORIGIN` on the
+   authenticated gateway and private MCP server. Configure
+   `HOSTED_TRACKER_READ_DATABASE_URL` only on the gateway using the restricted
+   `expense_tracker_reader` login. Both services keep their existing runtime
+   database connection for launch/session writes.
+4. Keep the MCP service private behind the gateway and keep the exact HTTPS
+   host and scheme when forwarding requests. Serve the widget build from the
+   same image. Disable access to request bodies and cookie headers in your
+   proxy, error reporting, and observability tools. The gateway emits the
+   launch credential in the tool response for the connecting host to present.
+   Verify that the host preserves the URL fragment and makes the link clickable.
+5. In a connected owner chat, ask to open the hosted tracker and click **Open
+   tracker** in the browser. Check expiration and sign-out before sharing the
+   entry point with your own clients.
+
+Coverage is per currency and reflects the owner's declaration for the entire
+ledger. Confirmed receipts alone provide recorded amounts. In chat use
+`declare_spending_coverage` to record tracking starts, completed import
+intervals, and gaps, and `get_spending_transactions` to inspect the comparison's
+members. Spending classification changes use `review_spending_classification`
+with the transaction revision and latest review ID.
+
+The protein metric uses confirmed grocery lines and documented purchased mass
+or volume. A source reference and original `protein_label` are required.
+Existing nutrition facts remain available for the basket grade and need a
+source recheck before they can enter this metric. Receipt-level discounts and
+refunds without the necessary allocation are excluded.

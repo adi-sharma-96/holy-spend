@@ -22,9 +22,11 @@ from app.plugin_models import (
     NutritionSignal,
     NutritionSummary,
     NutritionSummaryRequest,
+    ProteinCostSummary,
     SearchNutritionLookupsRequest,
     SearchNutritionLookupsResponse,
 )
+from app.protein_cost import protein_cost_line, summarize_protein_cost
 
 GROCERY_TAXONOMY_PREFIX = "food_dining.groceries."
 NO_MATCH_MAX_ATTEMPTS = 5
@@ -229,7 +231,7 @@ class NutritionRepository:
                 """
                 update nutrition_lookups
                 set status = 'matched', matched_product_name = %(product_name)s, source = %(source)s,
-                    source_ref = %(source_ref)s, nutriments = %(nutriments)s,
+                    source_ref = %(source_ref)s, nutriments = %(nutriments)s, protein_label = %(protein_label)s,
                     nutriscore_grade = %(nutriscore_grade)s, nutriscore_source = %(nutriscore_source)s,
                     fvl_percent = %(fvl_percent)s, nova_group = %(nova_group)s,
                     nova_group_estimated = %(nova_group_estimated)s,
@@ -244,6 +246,8 @@ class NutritionRepository:
                     "source": payload.source,
                     "source_ref": payload.source_ref,
                     "nutriments": Jsonb(nutriments),
+                    "protein_label": Jsonb(payload.protein_label.model_dump(mode="json"))
+                    if payload.protein_label else None,
                     "nutriscore_grade": nutriscore_grade,
                     "nutriscore_source": nutriscore_source,
                     "fvl_percent": fvl_percent,
@@ -260,7 +264,7 @@ class NutritionRepository:
             """
             update nutrition_lookups
             set status = 'no_match', attempts = attempts + 1,
-                matched_product_name = null, source = null, source_ref = null, nutriments = null,
+                matched_product_name = null, source = null, source_ref = null, nutriments = null, protein_label = null,
                 nutriscore_grade = null, nutriscore_source = null, fvl_percent = null,
                 nova_group = null, nova_group_estimated = false, match_confidence = null,
                 serving_size_g = null, serving_label = null
@@ -314,12 +318,17 @@ class NutritionRepository:
             grade_distribution=self._grade_distribution(current_items),
             signals=self._signals(current_items, overall_grade, previous_overall_grade),
             groups=self._group_by_category(current_rows, current_items),
+            protein_cost=self._protein_cost(
+                request.currency, window.current_start, window.current_end, lookups_by_identity,
+                request.protein_detail_offset,
+            ),
         )
 
     def _lookups_by_identity(self) -> dict[str, dict[str, Any]]:
         rows = self.conn.execute(
             """
-            select identity_key, status, matched_product_name, source, source_ref, nutriments,
+            select id, identity_key, status, matched_product_name, source, source_ref, nutriments,
+                   protein_label, updated_at,
                    nutriscore_grade, nutriscore_source, nova_group, nova_group_estimated,
                    serving_size_g, serving_label
             from nutrition_lookups
@@ -328,6 +337,78 @@ class NutritionRepository:
             {"user_id": self.user_id},
         ).fetchall()
         return {row["identity_key"]: row for row in rows}
+
+    def _protein_cost(
+        self, currency: str, start: date, end: date, lookups: dict[str, dict[str, Any]], offset: int,
+    ) -> ProteinCostSummary:
+        rows = self.conn.execute(
+            """/* nutrition:protein-lines */
+            select item.id, item.transaction_id, item.raw_name, item.normalized_name, item.brand,
+                   item.quantity, item.unit, item.measured_value, item.measured_unit,
+                   item.package_value, item.package_unit, item.product_identity_key, item.field_provenance,
+                   category.stable_key as category_slug, t.transaction_date, t.currency, t.source_type,
+                   t.transaction_type,
+                   case when item.line_subtotal_amount is not null then 'subtotal_less_line_discount'
+                        else 'line_total_less_line_tax_and_fees' end as price_basis_source,
+                   case when t.transaction_type = 'refund' then -abs(price.amount)
+                        else price.amount end as price_amount,
+                   coalesce(t.discount_amount, 0) > discounts.allocated
+                   or exists (
+                       select 1 from transaction_adjustments a
+                       where a.user_id = t.user_id and a.transaction_id = t.id
+                         and a.item_id is null and a.affects_total and a.type in ('discount', 'coupon')
+                   ) or coalesce((
+                       select sum(abs(a.amount)) from transaction_adjustments a
+                       where a.user_id = t.user_id and a.transaction_id = t.id and a.item_id = item.id
+                         and a.affects_total and a.type in ('discount', 'coupon')
+                   ), 0) > coalesce(item.line_discount_amount, 0) as unallocated_discount,
+                   case when exists (
+                       select 1 from receipt_document_events e
+                       where e.user_id = t.user_id and e.transaction_id = t.id
+                         and e.event_kind = 'purchase_refund'
+                         and e.item_disposition = 'returned' and e.item_id = item.id
+                   ) then 'returned_purchase_line'
+                   when exists (
+                       select 1 from receipt_document_events e
+                       where e.user_id = t.user_id and e.transaction_id = t.id
+                         and e.event_kind = 'purchase_refund'
+                         and (e.item_id is null or e.item_id = item.id or e.attribution_status = 'unknown')
+                   ) or exists (
+                       select 1 from transaction_adjustments a
+                       where a.user_id = t.user_id and a.transaction_id = t.id and a.type = 'refund'
+                         and (a.item_id is null or a.item_id = item.id)
+                   ) then 'refund_allocation_unknown'
+                   end as refund_reason
+            from transactions t
+            join transaction_items item on item.user_id = t.user_id and item.transaction_id = t.id
+            join taxonomy_nodes category on category.id = item.taxonomy_node_id
+            cross join lateral (
+                select coalesce(item.line_subtotal_amount - coalesce(item.line_discount_amount, 0),
+                                item.line_total_amount - coalesce(item.line_tax_amount, 0)
+                                    - coalesce(item.line_fee_amount, 0)) as amount
+            ) price
+            cross join lateral (
+                select coalesce(sum(i.line_discount_amount), 0) as allocated
+                from transaction_items i where i.user_id = t.user_id and i.transaction_id = t.id
+            ) discounts
+            where t.user_id = %(user_id)s and t.status = 'confirmed'
+              and t.transaction_type in ('expense', 'refund') and t.currency = %(currency)s
+              and t.transaction_date between %(start)s and %(end)s
+              and category.stable_key like %(grocery_prefix)s
+            order by t.transaction_date desc, t.id, item.id
+            """,
+            {"user_id": self.user_id, "currency": currency, "start": start, "end": end,
+             "grocery_prefix": f"{GROCERY_TAXONOMY_PREFIX}%"},
+        ).fetchall()
+        lines = [
+            protein_cost_line(
+                row,
+                lookups.get(nutrition_identity_key(row["normalized_name"], row["brand"], row["category_slug"]))
+                if row["normalized_name"] else None,
+            )
+            for row in rows
+        ]
+        return summarize_protein_cost(lines, offset)
 
     def _grocery_items(self, currency: str, start: date, end: date) -> list[dict[str, Any]]:
         rows = self.conn.execute(

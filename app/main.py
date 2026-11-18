@@ -24,6 +24,7 @@ from app.errors import (
     UploadRateLimitError,
     ValidationReferenceError,
 )
+from app.hosted_tracker import install_hosted_tracker
 from app.mcp_gateway import build_gateway_router, new_upstream_client
 from app.mcp_server import create_mcp_server
 from app.models import (
@@ -518,6 +519,8 @@ def create_app() -> FastAPI:
         compiler = AnalyticsQueryCompiler(today=lambda: local_today(settings))
         return AnalyticsRepository(ctx.conn, ctx.user.user_id, compiler).query(payload)
 
+    install_hosted_tracker(app, settings)
+
     if mcp_asgi is not None:
         # Keep the existing REST/OpenAPI routes authoritative, then delegate
         # the exact /mcp path to the SDK's Streamable HTTP ASGI application.
@@ -528,6 +531,7 @@ def create_app() -> FastAPI:
                 gateway_upstream_url,
                 gateway_client,
                 use_google_id_token=settings.mcp_gateway_use_google_id_token,
+                hosted_owner_id=settings.owner_user_id if settings.hosted_tracker_origin is not None else None,
             )
         )
     if settings.oauth_client_id is not None:

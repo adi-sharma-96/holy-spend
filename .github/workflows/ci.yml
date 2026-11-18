@@ -7,6 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -37,10 +38,6 @@ jobs:
         working-directory: widget
         run: npm ci
 
-      - name: Widget dependency audit
-        working-directory: widget
-        run: npm audit
-
       - name: Widget tests
         working-directory: widget
         run: npm test
@@ -49,8 +46,14 @@ jobs:
         working-directory: widget
         run: npm run build
 
+      - name: Widget dependency audit
+        run: |
+          npm --prefix widget audit --omit=dev
+          python scripts/widget_audit.py
+
   oauth-postgres:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16
@@ -71,11 +74,17 @@ jobs:
       PGDATABASE: postgres
       TEST_ADMIN_DATABASE_URL: postgresql://postgres:local-test-only@localhost:5432/postgres
       TEST_DATABASE_URL: postgresql://expense_app:r1-local-test@localhost:5432/postgres
+      TEST_TRACKER_READER_DATABASE_URL: postgresql://expense_tracker_reader:ws4-reader-test@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: widget/package-lock.json
       - name: Install dependencies
         run: python -m pip install -e ".[dev]"
       - name: Apply disposable schema and runtime grants
@@ -85,6 +94,15 @@ jobs:
             psql -v ON_ERROR_STOP=1 -q -f "$migration"
           done
           psql -v ON_ERROR_STOP=1 -v expense_app_password=r1-local-test -f supabase/bootstrap/001_runtime_role.sql
+          psql -v ON_ERROR_STOP=1 -v expense_tracker_reader_password=ws4-reader-test -f supabase/bootstrap/002_hosted_tracker_reader.sql
+      - name: Build tracker and install Chromium
+        run: |
+          npm --prefix widget ci
+          npm --prefix widget run build
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Spending, protein cost, and HTTPS browser acceptance
+        run: pytest tests/test_ws4_integration.py
       - name: OAuth PostgreSQL integration
         run: pytest tests/test_oauth_code_storage_integration.py
       - name: Product review and owner isolation PostgreSQL integration
