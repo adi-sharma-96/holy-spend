@@ -49,7 +49,7 @@ jobs:
       - name: Widget dependency audit
         run: |
           npm --prefix widget audit --omit=dev
-          python scripts/widget_audit.py
+          npm --prefix widget audit
 
   oauth-postgres:
     runs-on: ubuntu-latest
